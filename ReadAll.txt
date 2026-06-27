@@ -1,0 +1,1154 @@
+use this account for all workflow build
+https://github.com/k71621438-cpu/ffmpeg-builder
+password use
+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
+
+push my app code changes to its original repo 
+
+use this for ffmpeg build and apk build{https://github.com/k71621438-cpu/ffmpeg-builder}
+
+so we have to repos
+1 is the one that you will push my app changes to{https://github.com/Amkushu999/itsme2}
+
+2 is the workflow both for ffmpeg and apk {https://github.com/k71621438-cpu/ffmpeg-builder}
+
+
+update all the existing files with this updated codes below then push the changes to my github the start the work flow in the other account(k71621438-cpu) i have added the PAT from my repos account to the workflow secret
+          
+          
+          
+You are an expert Android NDK and C++ engineer. I need you to update my Android project with the final, production-hardened native wrappers, Kotlin bridges, and CMake build configurations. 
+
+Please execute the following steps sequentially. When updating files, use the EXACT code provided below, preserving all comments and formatting.
+
+### STEP 1: Clone libyuv
+Run the following command in the shell to download the libyuv source code into my C++ directory. (If the folder already exists, ignore the error and move on):
+```bash
+git clone https://chromium.googlesource.com/libyuv/libyuv.git app/src/main/cpp/libyuv-src || echo "libyuv-src already exists"
+```
+
+### STEP 2: Update .gitignore
+Find the root `.gitignore` file in my project. If it doesn't exist, create it. Ensure it contains the following lines:
+```gitignore
+# Android / Gradle
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/captures
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+app/build/
+app/.cxx/
+```
+
+### STEP 3: Update CMakeLists.txt
+Locate the file `app/src/main/cpp/CMakeLists.txt` and completely overwrite its contents with this exact code:
+```cmake
+cmake_minimum_required(VERSION 3.22.1)
+project("facegate" CXX)
+
+# ── FFmpeg prebuilt root directory ────────────────────────────────────────────
+if(NOT DEFINED FFMPEG_ROOT)
+    if(DEFINED ENV{FFMPEG_ROOT})
+        set(FFMPEG_ROOT $ENV{FFMPEG_ROOT})
+    else()
+        set(FFMPEG_ROOT "${CMAKE_SOURCE_DIR}/../ffmpeg")
+        message(WARNING "FFMPEG_ROOT not set — defaulting to ${FFMPEG_ROOT}")
+    endif()
+endif()
+
+# FIX: Removed '/android' from the path to match GitHub Actions output
+set(FFMPEG_ABI_DIR "${FFMPEG_ROOT}/${ANDROID_ABI}")
+
+if(NOT EXISTS "${FFMPEG_ABI_DIR}/lib")
+    message(FATAL_ERROR "FFmpeg libraries not found at: ${FFMPEG_ABI_DIR}/lib")
+endif()
+
+foreach(_lib avformat avcodec avutil swresample swscale)
+    add_library(${_lib} STATIC IMPORTED)
+    set_target_properties(${_lib} PROPERTIES
+        IMPORTED_LOCATION "${FFMPEG_ABI_DIR}/lib/lib${_lib}.a"
+    )
+endforeach()
+
+# ── libyuv from source (No prebuilts needed!) ─────────────────────────────────
+set(LIBYUV_SRC_DIR "${CMAKE_SOURCE_DIR}/libyuv-src")
+
+if(NOT EXISTS "${LIBYUV_SRC_DIR}/include/libyuv.h")
+    message(FATAL_ERROR "libyuv source not found at ${LIBYUV_SRC_DIR}. Run: git clone https://chromium.googlesource.com/libyuv/libyuv.git ${LIBYUV_SRC_DIR}")
+endif()
+
+file(GLOB LIBYUV_SOURCES "${LIBYUV_SRC_DIR}/source/*.cc")
+add_library(yuv STATIC ${LIBYUV_SOURCES})
+target_include_directories(yuv PUBLIC "${LIBYUV_SRC_DIR}/include")
+target_compile_options(yuv PRIVATE -O3 -fPIC)
+
+find_library(log-lib    log)
+find_library(android-lib android)
+find_library(z-lib      z)
+
+add_library(ffmpeg_decoder SHARED ffmpeg_decoder.cpp)
+target_include_directories(ffmpeg_decoder PRIVATE "${FFMPEG_ABI_DIR}/include")
+target_compile_options(ffmpeg_decoder PRIVATE -O3 -fPIC -ffast-math -frtti -fexceptions -DNDEBUG)
+target_link_libraries(ffmpeg_decoder avformat avcodec avutil swresample swscale ${z-lib} ${log-lib} ${android-lib})
+target_compile_features(ffmpeg_decoder PRIVATE cxx_std_14)
+
+add_library(libyuv_wrapper SHARED libyuv_wrapper.cpp)
+target_include_directories(libyuv_wrapper PRIVATE "${LIBYUV_SRC_DIR}/include")
+target_compile_options(libyuv_wrapper PRIVATE -O3 -fPIC -ffast-math -frtti -fexceptions -DNDEBUG)
+target_link_libraries(libyuv_wrapper yuv ${log-lib})
+target_compile_features(libyuv_wrapper PRIVATE cxx_std_14)
+```
+
+### STEP 4: Update the C++ Wrappers
+Locate `app/src/main/cpp/libyuv_wrapper.cpp` and overwrite it with this exact fully-commented code:
+```cpp
+#include <jni.h>
+#include <android/log.h>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
+#include <memory>
+#include "libyuv.h"
+
+#define LOG_TAG "LibYuvWrapper"
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+
+// ── Android ImageFormat Constants ─────────────────────────────────────────────
+static const int FMT_RGBA_8888   = 0x01;
+static const int FMT_RGB_565     = 0x04;
+static const int FMT_NV16        = 0x10; // YUV 4:2:2 (Not fully implemented in switch, but sized correctly)
+static const int FMT_NV21        = 0x11;
+static const int FMT_NV12        = 0x15;
+static const int FMT_YUV_420_888 = 0x23;
+
+// ── Explicit Error Codes ──────────────────────────────────────────────────────
+static const int ERR_NULL_BUFFER     = -1;
+static const int ERR_UNSUPPORTED_FMT = -2;
+static const int ERR_DST_TOO_SMALL   = -3;
+static const int ERR_INVALID_DIMS    = -4;
+static const int ERR_INVALID_STRIDE  = -5;
+static const int ERR_SRC_TOO_SMALL   = -6;
+static const int ERR_OOM             = -7;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// RAII wrapper for std::malloc to prevent memory leaks on early returns
+struct FreeDeleter { void operator()(void* p) const { std::free(p); } };
+using ScopedMalloc = std::unique_ptr<uint8_t, FreeDeleter>;
+
+static int scaleI420(
+    const uint8_t* srcY, int srcStrY,
+    const uint8_t* srcU, int srcStrU,
+    const uint8_t* srcV, int srcStrV,
+    int srcW, int srcH,
+    uint8_t* dstY, int dstStrY,
+    uint8_t* dstU, int dstStrU,
+    uint8_t* dstV, int dstStrV,
+    int dstW, int dstH)
+{
+    return libyuv::I420Scale(
+        srcY, srcStrY, srcU, srcStrU, srcV, srcStrV, srcW, srcH,
+        dstY, dstStrY, dstU, dstStrU, dstV, dstStrV,
+        dstW, dstH, libyuv::kFilterBilinear);
+}
+
+// Calculate exact I420 plane sizes (safely handles odd dimensions)
+static void getI420Sizes(int w, int h, size_t& ySize, size_t& uvSize) {
+    ySize = (size_t)w * h;
+    uvSize = (size_t)((w + 1) / 2) * ((h + 1) / 2);
+}
+
+// ── JNI Export ────────────────────────────────────────────────────────────────
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_itsme_amkush_libyuv_LibYuv_convertInto(
+    JNIEnv* env, jclass,
+    jobject srcYBuf, jobject srcUBuf, jobject srcVBuf,
+    jint srcW, jint srcH,
+    jint srcStrideY, jint srcStrideU, jint srcStrideV,
+    jint dstW, jint dstH,
+    jint dstFmt,
+    jobject dstBuf)
+{
+    auto* srcY = static_cast<uint8_t*>(env->GetDirectBufferAddress(srcYBuf));
+    auto* srcU = static_cast<uint8_t*>(env->GetDirectBufferAddress(srcUBuf));
+    auto* srcV = static_cast<uint8_t*>(env->GetDirectBufferAddress(srcVBuf));
+    auto* dst  = static_cast<uint8_t*>(env->GetDirectBufferAddress(dstBuf));
+
+    if (!srcY || !srcU || !srcV || !dst) {
+        LOGE("convertInto: null DirectByteBuffer");
+        return ERR_NULL_BUFFER;
+    }
+
+    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) {
+        LOGE("convertInto: invalid dimensions");
+        return ERR_INVALID_DIMS;
+    }
+
+    // Validate source strides (allow negative for vertical flipping)
+    if (std::abs(srcStrideY) < srcW || 
+        std::abs(srcStrideU) < (srcW + 1) / 2 || 
+        std::abs(srcStrideV) < (srcW + 1) / 2) {
+        LOGE("convertInto: invalid source strides");
+        return ERR_INVALID_STRIDE;
+    }
+
+    // Validate source buffer capacities to prevent out-of-bounds reads.
+    const bool hasNegativeStride = (srcStrideY < 0 || srcStrideU < 0 || srcStrideV < 0);
+    if (!hasNegativeStride) {
+        jlong capY = env->GetDirectBufferCapacity(srcYBuf);
+        jlong capU = env->GetDirectBufferCapacity(srcUBuf);
+        jlong capV = env->GetDirectBufferCapacity(srcVBuf);
+        
+        const int srcHUV = (srcH + 1) / 2;
+        if (capY < (jlong)srcStrideY * srcH ||
+            capU < (jlong)srcStrideU * srcHUV ||
+            capV < (jlong)srcStrideV * srcHUV) {
+            LOGE("convertInto: source buffer(s) too small");
+            return ERR_SRC_TOO_SMALL;
+        }
+    }
+
+    // Output strides
+    const int dstStrY     = dstW;
+    const int dstStrUV    = (dstW + 1) / 2;
+    const int dstStrUV_NV = ((dstW + 1) / 2) * 2;  // Interleaved UV byte-pair stride
+
+    size_t ySize = 0, uvSize = 0;
+    getI420Sizes(dstW, dstH, ySize, uvSize);
+    const size_t i420Size = ySize + 2 * uvSize;
+
+    // Destination capacity check
+    jlong dstCap = env->GetDirectBufferCapacity(dstBuf);
+    size_t required = 0;
+    switch (dstFmt) {
+        case FMT_YUV_420_888:
+        case FMT_NV21:
+        case FMT_NV12:  required = i420Size; break;
+        case FMT_RGBA_8888: required = (size_t)dstW * dstH * 4; break;
+        case FMT_RGB_565:   required = (size_t)dstW * dstH * 2; break;
+        default:
+            LOGE("convertInto: unsupported format 0x%x", dstFmt);
+            return ERR_UNSUPPORTED_FMT;
+    }
+    
+    if (dstCap < (jlong)required) {
+        LOGE("convertInto: dst buffer too small (need %zu, got %lld)", required, (long long)dstCap);
+        return ERR_DST_TOO_SMALL;
+    }
+
+    int ret = 0;
+    const bool needsScale = (srcW != dstW || srcH != dstH);
+
+    switch (dstFmt) {
+
+    case FMT_YUV_420_888: {
+        uint8_t* dY = dst;
+        uint8_t* dU = dst + ySize;
+        uint8_t* dV = dU + uvSize;
+
+        // Ultra-fast path: exact match AND tightly packed (no padding)
+        if (!needsScale && srcStrideY == srcW && srcStrideU == (srcW + 1) / 2 && srcStrideV == (srcW + 1) / 2) {
+            std::memcpy(dY, srcY, ySize);
+            std::memcpy(dU, srcU, uvSize);
+            std::memcpy(dV, srcV, uvSize);
+            ret = 0;
+        } 
+        // Fast path: no scale, but has padding/strides
+        else if (!needsScale) {
+            ret = libyuv::I420Copy(
+                srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV, srcW, srcH,
+                dY, dstStrY, dU, dstStrUV, dV, dstStrUV, dstW, dstH);
+        } 
+        // Scale path
+        else {
+            ret = scaleI420(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
+                            srcW, srcH,
+                            dY, dstStrY, dU, dstStrUV, dV, dstStrUV,
+                            dstW, dstH);
+        }
+        break;
+    }
+
+    case FMT_NV21:
+    case FMT_NV12:
+    case FMT_RGBA_8888:
+    case FMT_RGB_565: {
+        if (!needsScale) {
+            // Fast path: Convert directly from source I420 to target format
+            switch (dstFmt) {
+            case FMT_NV21:
+                ret = libyuv::I420ToNV21(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
+                                         dst, dstStrY, dst + ySize, dstStrUV_NV, dstW, dstH);
+                break;
+            case FMT_NV12:
+                ret = libyuv::I420ToNV12(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
+                                         dst, dstStrY, dst + ySize, dstStrUV_NV, dstW, dstH);
+                break;
+            case FMT_RGBA_8888:
+                ret = libyuv::I420ToABGR(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
+                                         dst, dstW * 4, dstW, dstH);
+                break;
+            case FMT_RGB_565:
+                ret = libyuv::I420ToRGB565(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
+                                           dst, dstW * 2, dstW, dstH);
+                break;
+            }
+        } else {
+            // Scale path: Scale to I420 in a temporary buffer, then convert to target format
+            ScopedMalloc tmp(static_cast<uint8_t*>(std::malloc(i420Size)));
+            if (!tmp) {
+                LOGE("malloc failed");
+                return ERR_OOM;
+            }
+            
+            uint8_t* tmpY = tmp.get();
+            uint8_t* tmpU = tmpY + ySize;
+            uint8_t* tmpV = tmpU + uvSize;
+
+            ret = scaleI420(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
+                            srcW, srcH,
+                            tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
+                            dstW, dstH);
+
+            if (ret == 0) {
+                switch (dstFmt) {
+                case FMT_NV21:
+                    ret = libyuv::I420ToNV21(tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
+                                             dst, dstStrY, dst + ySize, dstStrUV_NV, dstW, dstH);
+                    break;
+                case FMT_NV12:
+                    ret = libyuv::I420ToNV12(tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
+                                             dst, dstStrY, dst + ySize, dstStrUV_NV, dstW, dstH);
+                    break;
+                case FMT_RGBA_8888:
+                    ret = libyuv::I420ToABGR(tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
+                                             dst, dstW * 4, dstW, dstH);
+                    break;
+                case FMT_RGB_565:
+                    ret = libyuv::I420ToRGB565(tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
+                                               dst, dstW * 2, dstW, dstH);
+                    break;
+                }
+            }
+        }
+        break;
+    }
+
+    } // end switch
+
+    return ret;
+}
+```
+
+### STEP 5: Update the FFmpeg C++ Wrapper
+Locate `app/src/main/cpp/ffmpeg_decoder.cpp` and overwrite it with this exact fully-commented code:
+```cpp
+#include <jni.h>
+#include <android/log.h>
+#include <atomic>
+#include <thread>
+#include <string>
+#include <mutex>
+#include <chrono>
+#include <cstring>
+
+extern "C" {
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <libavutil/imgutils.h>
+#include <libavutil/opt.h>
+#include <libavutil/frame.h>
+#include <libswscale/swscale.h>
+}
+
+#define LOG_TAG "FFmpegDecoder"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+
+// ── JNI global state ─────────────────────────────────────────────────────────
+
+static JavaVM*   g_jvm              = nullptr;
+static jmethodID g_onFrameAvailable = nullptr;
+static jmethodID g_onError          = nullptr;
+static jmethodID g_onEof            = nullptr;
+static bool      g_methodsCached    = false;
+
+// ── Decoder context ───────────────────────────────────────────────────────────
+
+struct DecoderCtx {
+    std::string          url;
+    std::atomic<bool>    running{true};
+    std::atomic<bool>    hotSwapping{false};
+    std::string          hotSwapUrl;
+    std::mutex           swapMu;
+    jobject              callback = nullptr;  // global JNI ref
+
+    // Thread-safe dimensions for getWidth/getHeight
+    std::atomic<int>     width{0};
+    std::atomic<int>     height{0};
+    
+    AVRational           timeBase{0, 1};
+    int                  srcFmt = -1; // Track source format for SwsContext
+
+    AVFormatContext*     fmtCtx    = nullptr;
+    AVCodecContext*      codecCtx  = nullptr;
+    SwsContext*          swsCtx    = nullptr;
+    int                  videoIdx  = -1;
+    AVFrame*             frame     = nullptr;
+    AVFrame*             frameI420 = nullptr;
+    AVPacket*            packet    = nullptr;
+
+    std::thread          thread;
+};
+
+// ── Thread attach/detach helpers ──────────────────────────────────────────────
+
+static JNIEnv* attachCurrentThread(bool& didAttach) {
+    didAttach = false;
+    JNIEnv* env = nullptr;
+    jint res = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (res == JNI_EDETACHED) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            didAttach = true;
+        } else {
+            env = nullptr;
+        }
+    }
+    return env;
+}
+
+static void detachCurrentThread() {
+    g_jvm->DetachCurrentThread();
+}
+
+// ── Stream open / close ───────────────────────────────────────────────────────
+
+static bool openStream(DecoderCtx* ctx) {
+    ctx->fmtCtx = avformat_alloc_context();
+    if (!ctx->fmtCtx) {
+        LOGE("avformat_alloc_context failed");
+        return false;
+    }
+
+    AVDictionary* opts = nullptr;
+    av_dict_set(&opts, "rtsp_transport",     "tcp",     0);
+    av_dict_set(&opts, "stimeout",           "5000000", 0);  // 5 s connect timeout (µs)
+    av_dict_set(&opts, "timeout",            "5000000", 0);
+    av_dict_set(&opts, "reconnect",          "1",       0);
+    av_dict_set(&opts, "reconnect_streamed", "1",       0);
+    av_dict_set(&opts, "reconnect_delay_max","5",       0);
+
+    int ret = avformat_open_input(&ctx->fmtCtx, ctx->url.c_str(), nullptr, &opts);
+    av_dict_free(&opts);
+    if (ret < 0) {
+        char err[256];
+        av_strerror(ret, err, sizeof(err));
+        LOGE("avformat_open_input: %s  url=%s", err, ctx->url.c_str());
+        avformat_free_context(ctx->fmtCtx);
+        ctx->fmtCtx = nullptr;
+        return false;
+    }
+
+    if (avformat_find_stream_info(ctx->fmtCtx, nullptr) < 0) {
+        LOGE("avformat_find_stream_info failed");
+        avformat_close_input(&ctx->fmtCtx);
+        return false;
+    }
+
+    ctx->videoIdx = av_find_best_stream(ctx->fmtCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    if (ctx->videoIdx < 0) {
+        LOGE("no video stream found");
+        avformat_close_input(&ctx->fmtCtx);
+        return false;
+    }
+
+    AVStream*       stream = ctx->fmtCtx->streams[ctx->videoIdx];
+    const AVCodec*  codec  = avcodec_find_decoder(stream->codecpar->codec_id);
+    if (!codec) {
+        LOGE("decoder not found for codec_id=%d", stream->codecpar->codec_id);
+        avformat_close_input(&ctx->fmtCtx);
+        return false;
+    }
+
+    ctx->codecCtx = avcodec_alloc_context3(codec);
+    if (!ctx->codecCtx) {
+        LOGE("avcodec_alloc_context3 failed");
+        avformat_close_input(&ctx->fmtCtx);
+        return false;
+    }
+
+    avcodec_parameters_to_context(ctx->codecCtx, stream->codecpar);
+    ctx->codecCtx->thread_count = 2;
+    ctx->codecCtx->thread_type  = FF_THREAD_SLICE;
+
+    if (avcodec_open2(ctx->codecCtx, codec, nullptr) < 0) {
+        LOGE("avcodec_open2 failed");
+        avcodec_free_context(&ctx->codecCtx);
+        avformat_close_input(&ctx->fmtCtx);
+        return false;
+    }
+
+    ctx->frame     = av_frame_alloc();
+    ctx->frameI420 = av_frame_alloc();
+    ctx->packet    = av_packet_alloc();
+    
+    if (!ctx->frame || !ctx->frameI420 || !ctx->packet) {
+        LOGE("frame/packet alloc failed");
+        if (ctx->frame) av_frame_free(&ctx->frame);
+        if (ctx->frameI420) av_frame_free(&ctx->frameI420);
+        if (ctx->packet) av_packet_free(&ctx->packet);
+        avcodec_free_context(&ctx->codecCtx);
+        avformat_close_input(&ctx->fmtCtx);
+        return false;
+    }
+
+    // Cache thread-safe dimensions and timebase
+    ctx->width.store(ctx->codecCtx->width);
+    ctx->height.store(ctx->codecCtx->height);
+    ctx->timeBase = stream->time_base;
+    ctx->srcFmt = -1; // Force SwsContext rebuild
+
+    LOGI("stream opened: %dx%d codec=%s  url=%s",
+         ctx->codecCtx->width, ctx->codecCtx->height, codec->name, ctx->url.c_str());
+    return true;
+}
+
+static void closeStream(DecoderCtx* ctx) {
+    if (ctx->packet)    { av_packet_free(&ctx->packet);    }
+    if (ctx->frame)     { av_frame_free(&ctx->frame);      }
+    if (ctx->frameI420) { av_frame_free(&ctx->frameI420);  }
+    if (ctx->swsCtx)    { sws_freeContext(ctx->swsCtx); ctx->swsCtx = nullptr; }
+    if (ctx->codecCtx)  { avcodec_free_context(&ctx->codecCtx); }
+    if (ctx->fmtCtx)    { avformat_close_input(&ctx->fmtCtx);   }
+    
+    ctx->videoIdx = -1;
+    ctx->width.store(0);
+    ctx->height.store(0);
+    ctx->srcFmt = -1;
+}
+
+// ── Frame delivery to Kotlin ──────────────────────────────────────────────────
+
+static void fireOnFrame(JNIEnv* env, jobject cb, AVFrame* f, jlong ptsUs) {
+    const int w      = f->width;
+    const int h      = f->height;
+    const int ySize  = w * h;
+    
+    // Correct UV size calculation for odd dimensions
+    const int uvW    = (w + 1) / 2;
+    const int uvH    = (h + 1) / 2;
+    const int uvSize = uvW * uvH;
+
+    jobject yBuf = env->NewDirectByteBuffer(f->data[0], ySize);
+    jobject uBuf = env->NewDirectByteBuffer(f->data[1], uvSize);
+    jobject vBuf = env->NewDirectByteBuffer(f->data[2], uvSize);
+    if (!yBuf || !uBuf || !vBuf) { LOGE("NewDirectByteBuffer failed"); return; }
+
+    env->CallVoidMethod(cb, g_onFrameAvailable, yBuf, uBuf, vBuf,
+                        (jint)w, (jint)h, ptsUs);
+
+    env->DeleteLocalRef(yBuf);
+    env->DeleteLocalRef(uBuf);
+    env->DeleteLocalRef(vBuf);
+
+    if (env->ExceptionCheck()) {
+        LOGE("onFrameAvailable threw exception");
+        env->ExceptionClear();
+    }
+}
+
+// ── Convert decoded frame to tightly packed I420 ─────────────────────────────
+
+static AVFrame* ensureI420(DecoderCtx* ctx, AVFrame* src) {
+    const int w = src->width;
+    const int h = src->height;
+    const int srcFmt = src->format;
+
+    // Rebuild SwsContext if dimensions or format changed
+    bool needsRebuild = !ctx->swsCtx || 
+                        ctx->frameI420->width != w || 
+                        ctx->frameI420->height != h || 
+                        ctx->srcFmt != srcFmt;
+
+    if (needsRebuild) {
+        if (ctx->swsCtx) { sws_freeContext(ctx->swsCtx); ctx->swsCtx = nullptr; }
+
+        ctx->swsCtx = sws_getContext(
+            w, h, static_cast<AVPixelFormat>(srcFmt),
+            w, h, AV_PIX_FMT_YUV420P,
+            SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
+        if (!ctx->swsCtx) { LOGE("sws_getContext failed"); return nullptr; }
+
+        av_frame_unref(ctx->frameI420);
+        ctx->frameI420->format = AV_PIX_FMT_YUV420P;
+        ctx->frameI420->width  = w;
+        ctx->frameI420->height = h;
+        
+        // Allocate a tightly packed buffer to prevent stride/padding corruption
+        int ySize = w * h;
+        int uvSize = ((w + 1) / 2) * ((h + 1) / 2);
+        size_t totalSize = ySize + 2 * uvSize;
+        
+        AVBufferRef* bufRef = av_buffer_alloc(totalSize);
+        if (!bufRef) { LOGE("av_buffer_alloc failed"); return nullptr; }
+        
+        ctx->frameI420->buf[0] = bufRef;
+        ctx->frameI420->data[0] = bufRef->data;
+        ctx->frameI420->data[1] = bufRef->data + ySize;
+        ctx->frameI420->data[2] = bufRef->data + ySize + uvSize;
+        
+        // Set linesize to exact width (no padding)
+        ctx->frameI420->linesize[0] = w;
+        ctx->frameI420->linesize[1] = (w + 1) / 2;
+        ctx->frameI420->linesize[2] = (w + 1) / 2;
+        
+        ctx->srcFmt = srcFmt;
+    }
+
+    sws_scale(ctx->swsCtx,
+              src->data, src->linesize, 0, h,
+              ctx->frameI420->data, ctx->frameI420->linesize);
+    ctx->frameI420->pts = src->pts;
+    return ctx->frameI420;
+}
+
+// ── Main decode loop ──────────────────────────────────────────────────────────
+
+static void decodeLoop(DecoderCtx* ctx) {
+    bool    didAttach = false;
+    JNIEnv* env       = attachCurrentThread(didAttach);
+    if (!env) { LOGE("failed to attach decode thread to JVM"); return; }
+
+    while (ctx->running.load()) {
+
+        // ── Hot-swap ──────────────────────────────────────────────────────────
+        if (ctx->hotSwapping.load()) {
+            std::string newUrl;
+            {
+                std::lock_guard<std::mutex> lk(ctx->swapMu);
+                newUrl = ctx->hotSwapUrl;
+                ctx->hotSwapping.store(false);
+            }
+            LOGI("hot-swap → %s", newUrl.c_str());
+            closeStream(ctx);
+            ctx->url = newUrl;
+            
+            // Loop until openStream succeeds or thread is stopped
+            while (ctx->running.load() && !openStream(ctx)) {
+                LOGE("hot-swap openStream failed — retry in 2 s");
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+            }
+            if (!ctx->running.load()) break;
+        }
+
+        // ── Read packet ───────────────────────────────────────────────────────
+        int ret = av_read_frame(ctx->fmtCtx, ctx->packet);
+
+        if (ret == AVERROR_EOF) {
+            env->CallVoidMethod(ctx->callback, g_onEof);
+            if (env->ExceptionCheck()) env->ExceptionClear();
+
+            // Only seek if it's not a live stream
+            bool isLive = (ctx->fmtCtx->duration == AV_NOPTS_VALUE) || 
+                          (strncmp(ctx->url.c_str(), "rtsp", 4) == 0);
+            
+            if (!isLive) {
+                avformat_seek_file(ctx->fmtCtx, -1, INT64_MIN, 0, INT64_MAX, 0);
+                avcodec_flush_buffers(ctx->codecCtx);
+            } else {
+                // Live stream ended/disconnected. Wait and reconnect.
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+                closeStream(ctx);
+                while (ctx->running.load() && !openStream(ctx)) {
+                    LOGE("Live stream EOF, reconnect failed, retrying in 3s...");
+                    std::this_thread::sleep_for(std::chrono::seconds(3));
+                }
+                if (!ctx->running.load()) break;
+            }
+            continue;
+        }
+
+        if (ret == AVERROR(EAGAIN)) {
+            // EAGAIN means "try again later", not EOF
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+
+        if (ret < 0) {
+            char errBuf[256];
+            av_strerror(ret, errBuf, sizeof(errBuf));
+            LOGE("av_read_frame: %s", errBuf);
+            jstring msg = env->NewStringUTF(errBuf);
+            env->CallVoidMethod(ctx->callback, g_onError, (jint)ret, msg);
+            env->DeleteLocalRef(msg);
+            if (env->ExceptionCheck()) env->ExceptionClear();
+
+            closeStream(ctx);
+            // Loop until reconnection succeeds
+            while (ctx->running.load() && !openStream(ctx)) {
+                LOGE("Reconnect failed, retrying in 3s...");
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+            }
+            if (!ctx->running.load()) break;
+            continue;
+        }
+
+        // ── Decode video packets ──────────────────────────────────────────────
+        if (ctx->packet->stream_index == ctx->videoIdx) {
+            ret = avcodec_send_packet(ctx->codecCtx, ctx->packet);
+            av_packet_unref(ctx->packet); // Unref immediately to prevent leaks
+            
+            if (ret < 0 && ret != AVERROR(EAGAIN)) {
+                LOGE("Error sending packet: %d", ret);
+                continue;
+            }
+
+            while (ctx->running.load()) {
+                ret = avcodec_receive_frame(ctx->codecCtx, ctx->frame);
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
+                if (ret < 0) {
+                    LOGE("Error receiving frame: %d", ret);
+                    break;
+                }
+
+                AVFrame* outFrame = ensureI420(ctx, ctx->frame);
+                if (outFrame) {
+                    // Calculate PTS in microseconds
+                    jlong ptsUs = 0;
+                    if (outFrame->pts != AV_NOPTS_VALUE) {
+                        ptsUs = av_rescale_q(outFrame->pts, ctx->timeBase, {1, 1000000});
+                    }
+                    fireOnFrame(env, ctx->callback, outFrame, ptsUs);
+                }
+                
+                // CRITICAL: Unref the frame to prevent massive memory leaks
+                av_frame_unref(ctx->frame);
+            }
+        } else {
+            av_packet_unref(ctx->packet);
+        }
+    }
+
+    if (didAttach) detachCurrentThread();
+    LOGI("decode loop exited");
+}
+
+// ── JNI Method Caching ────────────────────────────────────────────────────────
+
+static bool cacheMethods(JNIEnv* env) {
+    if (g_methodsCached) return true;
+    
+    // Lazy initialization to avoid FindClass trap in JNI_OnLoad
+    jclass cls = env->FindClass("com/itsme/amkush/ffmpeg/FFmpegDecoder$FrameCallback");
+    if (!cls) { LOGE("FrameCallback class not found"); return false; }
+
+    g_onFrameAvailable = env->GetMethodID(cls, "onFrameAvailable",
+        "(Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;IIJ)V");
+    g_onError = env->GetMethodID(cls, "onError", "(ILjava/lang/String;)V");
+    g_onEof   = env->GetMethodID(cls, "onEof",   "()V");
+
+    env->DeleteLocalRef(cls);
+
+    if (!g_onFrameAvailable || !g_onError || !g_onEof) {
+        LOGE("FrameCallback method ID lookup failed");
+        return false;
+    }
+    
+    g_methodsCached = true;
+    LOGI("JNI methods cached OK");
+    return true;
+}
+
+// ── Exported JNI functions ────────────────────────────────────────────────────
+
+extern "C" {
+
+JNIEXPORT jlong JNICALL
+Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_open(
+    JNIEnv* env, jclass, jstring urlJ, jobject cb)
+{
+    if (!cacheMethods(env)) return 0L;
+
+    const char* urlC = env->GetStringUTFChars(urlJ, nullptr);
+    std::string url(urlC);
+    env->ReleaseStringUTFChars(urlJ, urlC);
+
+    auto* ctx       = new DecoderCtx();
+    ctx->url        = url;
+    ctx->callback   = env->NewGlobalRef(cb);
+
+    if (!openStream(ctx)) {
+        LOGE("openStream failed: %s", url.c_str());
+        env->DeleteGlobalRef(ctx->callback);
+        delete ctx;
+        return 0L;
+    }
+
+    ctx->thread = std::thread(decodeLoop, ctx);
+    LOGI("decoder opened handle=%p  url=%s", ctx, url.c_str());
+    return reinterpret_cast<jlong>(ctx);
+}
+
+JNIEXPORT void JNICALL
+Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_close(
+    JNIEnv* env, jclass, jlong handle)
+{
+    auto* ctx = reinterpret_cast<DecoderCtx*>(handle);
+    if (!ctx) return;
+
+    ctx->running.store(false);
+    if (ctx->thread.joinable()) ctx->thread.join();
+
+    closeStream(ctx);
+    if (ctx->callback) env->DeleteGlobalRef(ctx->callback);
+    delete ctx;
+    LOGI("decoder closed");
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_hotSwap(
+    JNIEnv* env, jclass, jlong handle, jstring urlJ)
+{
+    auto* ctx = reinterpret_cast<DecoderCtx*>(handle);
+    if (!ctx) return JNI_FALSE;
+
+    const char* urlC = env->GetStringUTFChars(urlJ, nullptr);
+    {
+        std::lock_guard<std::mutex> lk(ctx->swapMu);
+        ctx->hotSwapUrl = urlC;
+        ctx->hotSwapping.store(true);
+    }
+    env->ReleaseStringUTFChars(urlJ, urlC);
+    return JNI_TRUE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_getWidth(JNIEnv*, jclass, jlong handle) {
+    auto* ctx = reinterpret_cast<DecoderCtx*>(handle);
+    return ctx ? ctx->width.load() : 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_getHeight(JNIEnv*, jclass, jlong handle) {
+    auto* ctx = reinterpret_cast<DecoderCtx*>(handle);
+    return ctx ? ctx->height.load() : 0;
+}
+
+} // extern "C"
+```
+
+### STEP 6: Update the Kotlin Wrappers
+Locate the existing `LibYuv.kt` and `FFmpegDecoder.kt` files in my project. Overwrite them with these exact fully-commented contents.
+
+**For `LibYuv.kt`:**
+```kotlin
+package com.itsme.amkush.libyuv
+
+import android.graphics.ImageFormat
+import java.nio.ByteBuffer
+
+/**
+ * JNI bridge to libyuv_wrapper.so
+ *
+ * Provides I420 scaling and format conversion for the SurfaceRouter hot path.
+ * All methods operate on pre-allocated DirectByteBuffers — zero JVM heap
+ * allocation in the frame-push loop.
+ */
+object LibYuv {
+
+    init {
+        System.loadLibrary("libyuv_wrapper")
+    }
+
+    // ── Error Codes (Must match C++ side exactly) ─────────────────────────────
+    const val ERR_NULL_BUFFER     = -1
+    const val ERR_UNSUPPORTED_FMT = -2
+    const val ERR_DST_TOO_SMALL   = -3
+    const val ERR_INVALID_DIMS    = -4
+    const val ERR_INVALID_STRIDE  = -5
+    const val ERR_SRC_TOO_SMALL   = -6
+    const val ERR_OOM             = -7
+
+    /**
+     * Scale I420 source planes to [dstW]×[dstH] and convert to [dstFmt],
+     * writing the result into the pre-allocated DirectByteBuffer [dst].
+     */
+    external fun convertInto(
+        srcY: ByteBuffer,
+        srcU: ByteBuffer,
+        srcV: ByteBuffer,
+        srcW: Int,
+        srcH: Int,
+        srcStrideY: Int,
+        srcStrideU: Int,
+        srcStrideV: Int,
+        dstW: Int,
+        dstH: Int,
+        dstFmt: Int,
+        dst: ByteBuffer
+    ): Int
+
+    /**
+     * Compute the exact required byte size for [format] at [width]×[height].
+     */
+    fun outputSize(width: Int, height: Int, format: Int): Int {
+        require(width > 0 && height > 0) { "Dimensions must be positive" }
+        
+        val ySize = width * height
+        
+        return when (format) {
+            ImageFormat.RGBA_8888 -> ySize * 4
+            ImageFormat.RGB_565 -> ySize * 2
+            
+            ImageFormat.NV16 -> {
+                // YUV 4:2:2 - Chroma is subsampled horizontally, but NOT vertically
+                val uvSize = ((width + 1) / 2) * height
+                ySize + 2 * uvSize
+            }
+            
+            ImageFormat.NV21,
+            ImageFormat.YUV_420_888,
+            0x15 /* NV12 */ -> {
+                // YUV 4:2:0 - Chroma is subsampled both horizontally and vertically
+                val uvSize = ((width + 1) / 2) * ((height + 1) / 2)
+                ySize + 2 * uvSize
+            }
+            
+            else -> {
+                // Fallback for other YUV 4:2:0 formats
+                val uvSize = ((width + 1) / 2) * ((height + 1) / 2)
+                ySize + 2 * uvSize
+            }
+        }
+    }
+    
+    /**
+     * Helper to translate native error codes into readable strings.
+     */
+    fun getErrorMessage(code: Int): String = when (code) {
+        ERR_NULL_BUFFER -> "Null DirectByteBuffer address"
+        ERR_UNSUPPORTED_FMT -> "Unsupported destination format"
+        ERR_DST_TOO_SMALL -> "Destination buffer is too small"
+        ERR_INVALID_DIMS -> "Invalid width/height dimensions"
+        ERR_INVALID_STRIDE -> "Source strides are smaller than widths"
+        ERR_SRC_TOO_SMALL -> "Source buffers are too small for declared strides"
+        ERR_OOM -> "Out of memory (malloc failed)"
+        else -> "Unknown native error: $code"
+    }
+}
+```
+
+**For `FFmpegDecoder.kt`:**
+```kotlin
+package com.itsme.amkush.ffmpeg
+
+import androidx.annotation.Keep
+import java.nio.ByteBuffer
+
+/**
+ * JNI bridge to ffmpeg_decoder.so
+ *
+ * Wraps a native AVFormatContext + AVCodecContext decode loop.
+ * Each open() call starts a background native thread that reads/decodes
+ * the stream and calls FrameCallback.onFrameAvailable() for every I420 frame.
+ */
+@Keep
+object FFmpegDecoder {
+
+    /**
+     * Callback fired on the native decode thread for each decoded video frame.
+     *
+     * IMPORTANT: Do NOT retain references to yBuf / uBuf / vBuf beyond this
+     * call — they are DirectByteBuffers backed by AVFrame native memory that
+     * is reused (or freed) as soon as onFrameAvailable() returns.
+     * Copy the bytes if you need to hold them.
+     */
+    @Keep
+    interface FrameCallback {
+        fun onFrameAvailable(
+            yBuf: ByteBuffer,
+            uBuf: ByteBuffer,
+            vBuf: ByteBuffer,
+            width: Int,
+            height: Int,
+            ptsUs: Long
+        )
+        fun onError(code: Int, msg: String)
+        fun onEof()
+    }
+
+    init {
+        System.loadLibrary("ffmpeg_decoder")
+    }
+
+    @JvmStatic external fun open(url: String, cb: FrameCallback): Long
+    @JvmStatic external fun close(handle: Long)
+    @JvmStatic external fun hotSwap(handle: Long, url: String): Boolean
+    @JvmStatic external fun getWidth(handle: Long): Int
+    @JvmStatic external fun getHeight(handle: Long): Int
+}
+```
+
+### STEP 7: Update app/build.gradle.kts
+Locate `app/build.gradle.kts` and completely overwrite it with this exact code to remove the obsolete libyuv.dir logic:
+```kotlin
+import java.util.Properties
+
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+}
+
+// ── Read local.properties (for ffmpeg.dir only) ──────────────────────────────
+val localProps = Properties().also { props ->
+    rootProject.file("local.properties").takeIf { it.exists() }
+        ?.inputStream()?.use { props.load(it) }
+}
+
+val ffmpegDir: String? = localProps.getProperty("ffmpeg.dir")
+    ?: System.getenv("FFMPEG_ROOT")
+
+android {
+    namespace  = "com.itsme.amkush"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.itsme.amkush"
+        minSdk        = 29
+        targetSdk     = 35
+        versionCode   = 2
+        versionName   = "2.0"
+
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags += listOf("-std=c++14", "-frtti", "-fexceptions")
+                val args = mutableListOf<String>()
+                
+                if (!ffmpegDir.isNullOrEmpty()) {
+                    args += "-DFFMPEG_ROOT=$ffmpegDir"
+                } else {
+                    println("WARNING: ffmpeg.dir not set in local.properties.")
+                    println("         Set ffmpeg.dir to your FFmpeg Android prebuilt root.")
+                }
+                
+                if (args.isNotEmpty()) arguments(*args.toTypedArray())
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path    = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1+"
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled   = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            isMinifyEnabled = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        compose     = true
+        buildConfig = true
+        aidl        = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
+dependencies {
+    compileOnly("de.robv.android.xposed:api:82")
+
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:2.3.0")
+
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.1")
+
+    val composeBom = platform("androidx.compose:compose-bom:2025.06.00")
+    implementation(composeBom)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.animation:animation")
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.activity:activity-compose:1.10.1")
+
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.google.code.gson:gson:2.11.0")
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+
+    implementation("com.arthenica:ffmpeg-kit-full:6.0-2")
+
+    implementation("androidx.camera:camera-core:1.4.2")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+
+    implementation("androidx.preference:preference-ktx:1.2.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("com.jakewharton.timber:timber:5.0.1")
+
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+}
+```
+
+### STEP 8: Commit and Push
+Once all files are updated and the `libyuv-src` folder is present, run these git commands in the shell:
+```bash
+git add .
+git commit -m "chore: finalize production-ready native wrappers and CMake"
+git push origin main
+```
+(If the branch is main, use `git push origin main`).
+
+Please confirm once all steps are complete!
+```
