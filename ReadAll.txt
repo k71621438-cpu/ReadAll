@@ -1,13 +1,13 @@
 Make sure to read all this..line by line
 
 understand my codebase so that u dont do any mistake of removing or deleting things
-also make sure to understand AOSP and shadowhook of bytedance coz my app relies on that
+also make sure to understand AOSP  coz my app relies on that
 
 when done fixing all that make sure to start the workflow from the workflow repo
 also move the urls in to native not in kotlin
 
 
-so my app source code is at https://github.com/Amkushu999/itsme4 fetch it (PAT for this account is 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)
+so my app source code is at https://github.com/Amkushu999/itsme4 fetch it
 what i want is u to read all the below so you understand it
 understand my codebase first
 
