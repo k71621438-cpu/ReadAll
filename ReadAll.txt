@@ -124,7 +124,7 @@ fun verifyAndUnpack(response: JSONObject, sentRid: String): JSONObject? {
 move the license to apk from zygisk-module/jni/license
 
 
-also change the Admin Credits Screen exactly like this
+also change the Admin Credits Screen exactly like this....so this is a web script....i created that to act as a mock so that u apply exactly as it in Admin Credit screen in Homescreen ok
 
 
 
