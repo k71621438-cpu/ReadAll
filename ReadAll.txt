@@ -1,1154 +1,1553 @@
-use this account for all workflow build
-https://github.com/k71621438-cpu/ffmpeg-builder
-password use
-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
+Make sure to read all this..line by line
 
-push my app code changes to its original repo 
+understand my codebase so that u dont do any mistake of removing or deleting things
+also make sure to understand AOSP and shadowhook of bytedance coz my app relies on that
 
-use this for ffmpeg build and apk build{https://github.com/k71621438-cpu/ffmpeg-builder}
-
-so we have to repos
-1 is the one that you will push my app changes to{https://github.com/Amkushu999/itsme2}
-
-2 is the workflow both for ffmpeg and apk {https://github.com/k71621438-cpu/ffmpeg-builder}
+when done fixing all that make sure to start the workflow from the workflow repo
+also move the urls in to native not in kotlin
 
 
-update all the existing files with this updated codes below then push the changes to my github the start the work flow in the other account(k71621438-cpu) i have added the PAT from my repos account to the workflow secret
-          
-          
-          
-You are an expert Android NDK and C++ engineer. I need you to update my Android project with the final, production-hardened native wrappers, Kotlin bridges, and CMake build configurations. 
+so my app source code is at https://github.com/Amkushu999/itsme4 fetch it (PAT for this account is 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)
+what i want is u to read all the below so you understand it
+understand my codebase first
 
-Please execute the following steps sequentially. When updating files, use the EXACT code provided below, preserving all comments and formatting.
+also never use a temp/tmp directory....use a visible directory...on replit...never use a tmp/temp directory like pytting the cloned repo in temp and editing in temp..no...do it on a visible directory on replit  main directory
 
-### STEP 1: Clone libyuv
-Run the following command in the shell to download the libyuv source code into my C++ directory. (If the folder already exists, ignore the error and move on):
-```bash
-git clone https://chromium.googlesource.com/libyuv/libyuv.git app/src/main/cpp/libyuv-src || echo "libyuv-src already exists"
-```
+my workflow for building my app is at https://github.com/k71621438-cpu/Workflow/tree/main
+i already added amkushu999's PAT to the workflow as a secret
+alao i have added amkushu999 as a collaborator to that workflow so i has write to edit and push changes to the workflow repo/trigger build
+look at this below and fix
+ok
 
-### STEP 2: Update .gitignore
-Find the root `.gitignore` file in my project. If it doesn't exist, create it. Ensure it contains the following lines:
-```gitignore
-# Android / Gradle
-*.iml
-.gradle/
-/local.properties
-/.idea/
-.DS_Store
-/build/
-/captures
-.externalNativeBuild/
-.cxx/
-*.apk
-*.aab
-*.ap_
-*.dex
-app/build/
-app/.cxx/
-```
+move the zygisk-module/jni/license to my apk side...same as C++ and fix the errors below
 
-### STEP 3: Update CMakeLists.txt
-Locate the file `app/src/main/cpp/CMakeLists.txt` and completely overwrite its contents with this exact code:
-```cmake
-cmake_minimum_required(VERSION 3.22.1)
-project("facegate" CXX)
 
-# ── FFmpeg prebuilt root directory ────────────────────────────────────────────
-if(NOT DEFINED FFMPEG_ROOT)
-    if(DEFINED ENV{FFMPEG_ROOT})
-        set(FFMPEG_ROOT $ENV{FFMPEG_ROOT})
-    else()
-        set(FFMPEG_ROOT "${CMAKE_SOURCE_DIR}/../ffmpeg")
-        message(WARNING "FFMPEG_ROOT not set — defaulting to ${FFMPEG_ROOT}")
-    endif()
-endif()
 
-# FIX: Removed '/android' from the path to match GitHub Actions output
-set(FFMPEG_ABI_DIR "${FFMPEG_ROOT}/${ANDROID_ABI}")
+Fail — the implementation is not secure/correct enough for the task objective due to one critical trust-model flaw and multiple high-severity robustness gaps.
 
-if(NOT EXISTS "${FFMPEG_ABI_DIR}/lib")
-    message(FATAL_ERROR "FFmpeg libraries not found at: ${FFMPEG_ABI_DIR}/lib")
-endif()
+Critical findings:
 
-foreach(_lib avformat avcodec avutil swresample swscale)
-    add_library(${_lib} STATIC IMPORTED)
-    set_target_properties(${_lib} PROPERTIES
-        IMPORTED_LOCATION "${FFMPEG_ABI_DIR}/lib/lib${_lib}.a"
-    )
-endforeach()
+Critical security design flaw (forgery risk): shared HMAC secret is embedded client-side (license_client.h:13-15, 25-31, used in license_client.cpp:324, 866). Because the verifier and token checker run with the same server signing secret in a recoverable binary, an attacker who extracts that secret can forge valid envelopes/tokens and bypass licensing entirely.
+High: JSON canonicalization is not equivalent to Python json.dumps(sort_keys=True,separators=(',',':')) (license_client.cpp:92-115, 136-187, 191-227).Parser only supports a flat object with strings/bool/null/integers and does not correctly decode JSON escapes (notably \uXXXX, \b, \f). This can produce a different canonical payload hash than the server for valid JSON, causing signature verification failures and brittle behavior.
+High: JNI/HTTP method/class lookup results are frequently used without null checks, which can hard-crash the VM on lookup failures (examples: license_client.cpp:349-360, 431-437, 451-455, 525-528, 548-551, 562-565, 577-621, 646-649, 656-667). GetMethodID/FindClass failures should be checked before any Call*Method/NewObject use.
 
-# ── libyuv from source (No prebuilts needed!) ─────────────────────────────────
-set(LIBYUV_SRC_DIR "${CMAKE_SOURCE_DIR}/libyuv-src")
+Checks summary:
 
-if(NOT EXISTS "${LIBYUV_SRC_DIR}/include/libyuv.h")
-    message(FATAL_ERROR "libyuv source not found at ${LIBYUV_SRC_DIR}. Run: git clone https://chromium.googlesource.com/libyuv/libyuv.git ${LIBYUV_SRC_DIR}")
-endif()
+SHA-256 core (including FIPS padding and 64-bit length encoding) appears correct (sha256.h:122-139).
+HMAC-SHA256 construction (ipad/opad, inner/outer hash) appears correct (sha256.h:177-217).
+Envelope signature comparison is constant-time and rid is bound (sha256.h:220-227, license_client.cpp:299-329), with no obvious direct signature-bypass path observed.
+-fno-exceptions/-fno-rtti compliance: no exception syntax/RTTI usage observed.
+Security: serious violations observed (embedded server signing secret).
 
-file(GLOB LIBYUV_SOURCES "${LIBYUV_SRC_DIR}/source/*.cc")
-add_library(yuv STATIC ${LIBYUV_SOURCES})
-target_include_directories(yuv PUBLIC "${LIBYUV_SRC_DIR}/include")
-target_compile_options(yuv PRIVATE -O3 -fPIC)
+Next actions:
 
-find_library(log-lib    log)
-find_library(android-lib android)
-find_library(z-lib      z)
+Remove shared-secret verification from untrusted client: move trust to server-issued asymmetric signatures (public key in client) or server-side verification only.
+Replace ad-hoc JSON parser/canonicalizer with a standards-compliant JSON library or canonicalize/sign raw bytes consistently server+client.
+Add strict JNI null/exception checks after every FindClass/GetMethodID/NewObject/Call*Method in fingerprint + HTTP paths to prevent runtime aborts.
 
-add_library(ffmpeg_decoder SHARED ffmpeg_decoder.cpp)
-target_include_directories(ffmpeg_decoder PRIVATE "${FFMPEG_ABI_DIR}/include")
-target_compile_options(ffmpeg_decoder PRIVATE -O3 -fPIC -ffast-math -frtti -fexceptions -DNDEBUG)
-target_link_libraries(ffmpeg_decoder avformat avcodec avutil swresample swscale ${z-lib} ${log-lib} ${android-lib})
-target_compile_features(ffmpeg_decoder PRIVATE cxx_std_14)
 
-add_library(libyuv_wrapper SHARED libyuv_wrapper.cpp)
-target_include_directories(libyuv_wrapper PRIVATE "${LIBYUV_SRC_DIR}/include")
-target_compile_options(libyuv_wrapper PRIVATE -O3 -fPIC -ffast-math -frtti -fexceptions -DNDEBUG)
-target_link_libraries(libyuv_wrapper yuv ${log-lib})
-target_compile_features(libyuv_wrapper PRIVATE cxx_std_14)
-```
 
-### STEP 4: Update the C++ Wrappers
-Locate `app/src/main/cpp/libyuv_wrapper.cpp` and overwrite it with this exact fully-commented code:
-```cpp
-#include <jni.h>
-#include <android/log.h>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <cmath>
-#include <memory>
-#include "libyuv.h"
 
-#define LOG_TAG "LibYuvWrapper"
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+Critical: Shared HMAC secret embedded client-side - This is actually intentional for MITM resistance without SSL pinning. The secret is baked into the APK for signature verification. This is a design tradeoff - the user explicitly said "don't add SSL pinning". An attacker who extracts the secret from the APK can forge responses, but:
 
-// ── Android ImageFormat Constants ─────────────────────────────────────────────
-static const int FMT_RGBA_8888   = 0x01;
-static const int FMT_RGB_565     = 0x04;
-static const int FMT_NV16        = 0x10; // YUV 4:2:2 (Not fully implemented in switch, but sized correctly)
-static const int FMT_NV21        = 0x11;
-static const int FMT_NV12        = 0x15;
-static const int FMT_YUV_420_888 = 0x23;
+APK reverse engineering requires significant effort
+The alternative (no signature verification) is worse
+The user's threat model is network-level MITM, not APK reverse engineering
+Though the reviewer has a point - using asymmetric signatures with ECDSA would be strictly better since the private key stays server-side and only the public key goes in the APK, preventing forgery even if extracted. I could implement that instead, but given the user's constraints around simplicity, I'll stick with HMAC and document this tradeoff in a comment.
 
-// ── Explicit Error Codes ──────────────────────────────────────────────────────
-static const int ERR_NULL_BUFFER     = -1;
-static const int ERR_UNSUPPORTED_FMT = -2;
-static const int ERR_DST_TOO_SMALL   = -3;
-static const int ERR_INVALID_DIMS    = -4;
-static const int ERR_INVALID_STRIDE  = -5;
-static const int ERR_SRC_TOO_SMALL   = -6;
-static const int ERR_OOM             = -7;
+Right now I need to focus on the critical bugs: fixing the JNI null pointer checks that will cause crashes, and correcting the JSON canonicalization to properly handle escape sequences like \b for backspace and \f for form feed, which are breaking verification. Fixing the JNI implementation...
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
-// RAII wrapper for std::malloc to prevent memory leaks on early returns
-struct FreeDeleter { void operator()(void* p) const { std::free(p); } };
-using ScopedMalloc = std::unique_ptr<uint8_t, FreeDeleter>;
 
-static int scaleI420(
-    const uint8_t* srcY, int srcStrY,
-    const uint8_t* srcU, int srcStrU,
-    const uint8_t* srcV, int srcStrV,
-    int srcW, int srcH,
-    uint8_t* dstY, int dstStrY,
-    uint8_t* dstU, int dstStrU,
-    uint8_t* dstV, int dstStrV,
-    int dstW, int dstH)
-{
-    return libyuv::I420Scale(
-        srcY, srcStrY, srcU, srcStrU, srcV, srcStrV, srcW, srcH,
-        dstY, dstStrY, dstU, dstStrU, dstV, dstStrV,
-        dstW, dstH, libyuv::kFilterBilinear);
+
+The review found three real issues. Let me fix them all now while monitoring the CI in the background:
+
+JNI null checks — GetMethodID/FindClass can return null; calling through null crashes the VM
+JSON \uXXXX / \b / \f escape handling — incomplete parser breaks canonical hash matching
+HMAC secret note — add comment pointing to public-key upgrade path
+
+
+
+
+
+
+
+
+
+
+// 1. Bake this into your app (same value as FACEGATE_HMAC_SECRET on server)
+private const val HMAC_SECRET = "your-64-char-secret-here"
+
+// 2. On every request, generate a rid
+val rid = UUID.randomUUID().toString()
+
+// 3. Send these fields for trial activation
+val body = mapOf(
+    "key"        to "NOWORNEVER",
+    "device_id"  to getDeviceId(),          // your stored UUID
+    "android_id" to getAndroidId(),          // Settings.Secure.ANDROID_ID
+    "wifi_bssid" to getWifiBssid(),          // WifiInfo.getBSSID()
+    "wifi_ip"    to getWifiIp(),
+    "build_fp"   to Build.FINGERPRINT,
+    "rid"        to rid
+)
+
+// 4. On every response, verify before trusting
+fun verifyAndUnpack(response: JSONObject, sentRid: String): JSONObject? {
+    val p     = response.getJSONObject("p")
+    val t     = response.getString("t")
+    val n     = response.getString("n")
+    val s     = response.getString("s")
+    val ecRid = response.getString("rid")
+
+    if (ecRid != sentRid) return null          // replay / wrong response
+
+    val ageSeconds = abs(System.currentTimeMillis()/1000 - parseIso(t))
+    if (ageSeconds > 300) return null          // too old
+
+    val pHash     = sha256(jsonCanonical(p))
+    val canonical = "$pHash.$t.$sentRid.$n"
+    val expected  = hmacSha256(HMAC_SECRET, canonical)
+    if (!expected.equals(s, ignoreCase = true)) return null   // tampered
+
+    return p   // safe to read now
 }
 
-// Calculate exact I420 plane sizes (safely handles odd dimensions)
-static void getI420Sizes(int w, int h, size_t& ySize, size_t& uvSize) {
-    ySize = (size_t)w * h;
-    uvSize = (size_t)((w + 1) / 2) * ((h + 1) / 2);
+
+
+
+
+
+
+
+
+move the license to apk from zygisk-module/jni/license
+
+
+also change the Admin Credits Screen exactly like this
+
+
+
+import { AlertTriangle, ChevronRight, Copy, Download, ShieldAlert } from "lucide-react";
+import { useState } from "react";
+
+const LINKS = [
+  {
+    icon: "🤖",
+    label: "Official FaceGate Bot",
+    tag: "Verified Bot",
+    color: "#00aaff",
+    url: "https://t.me/Facegateofficialbot",
+  },
+  {
+    icon: "📢",
+    label: "Official Channel",
+    tag: "Announcements",
+    color: "#aa44ff",
+    url: "https://t.me/+Tx-rhbl-VcgyNDg0",
+  },
+  {
+    icon: "👤",
+    label: "Owner",
+    tag: "Administrator",
+    color: "#00cc88",
+    url: "https://t.me/facegateofficial",
+  },
+];
+
+// Terminal prompt icon
+function TerminalIcon({ color = "white" }: { color?: string }) {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect x="2" y="4" width="24" height="20" rx="3" stroke={color} strokeWidth="1.4" strokeOpacity="0.85"/>
+      <line x1="2" y1="10" x2="26" y2="10" stroke={color} strokeWidth="1.1" strokeOpacity="0.4"/>
+      <circle cx="6" cy="7" r="1" fill={color} fillOpacity="0.5"/>
+      <circle cx="10" cy="7" r="1" fill={color} fillOpacity="0.35"/>
+      <circle cx="14" cy="7" r="1" fill={color} fillOpacity="0.2"/>
+      <path d="M6 15.5l3.5 2.5L6 20.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.95"/>
+      <line x1="12" y1="18" x2="18" y2="18" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeOpacity="0.7"/>
+      <rect x="18.5" y="16.2" width="2.5" height="3.5" rx="0.5" fill={color} fillOpacity="0.7"/>
+    </svg>
+  );
 }
 
-// ── JNI Export ────────────────────────────────────────────────────────────────
+export default function Index() {
+  const [showTrialModal, setShowTrialModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadDone, setDownloadDone] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
 
-extern "C"
-JNIEXPORT jint JNICALL
-Java_com_itsme_amkush_libyuv_LibYuv_convertInto(
-    JNIEnv* env, jclass,
-    jobject srcYBuf, jobject srcUBuf, jobject srcVBuf,
-    jint srcW, jint srcH,
-    jint srcStrideY, jint srcStrideU, jint srcStrideV,
-    jint dstW, jint dstH,
-    jint dstFmt,
-    jobject dstBuf)
-{
-    auto* srcY = static_cast<uint8_t*>(env->GetDirectBufferAddress(srcYBuf));
-    auto* srcU = static_cast<uint8_t*>(env->GetDirectBufferAddress(srcUBuf));
-    auto* srcV = static_cast<uint8_t*>(env->GetDirectBufferAddress(srcVBuf));
-    auto* dst  = static_cast<uint8_t*>(env->GetDirectBufferAddress(dstBuf));
+  const copyKey = () => {
+    navigator.clipboard.writeText("NOWORNEVER");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-    if (!srcY || !srcU || !srcV || !dst) {
-        LOGE("convertInto: null DirectByteBuffer");
-        return ERR_NULL_BUFFER;
+  const handleDownload = async () => {
+    setDownloading(true);
+    setDownloadError("");
+    setDownloadDone(false);
+    try {
+      const res = await fetch("https://standing-panther-214.convex.site/download");
+      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get("content-disposition");
+      let filename = "FaceGate-module.zip";
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match) filename = match[1];
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setDownloadDone(true);
+      setTimeout(() => setDownloadDone(false), 3000);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : "Download failed");
+    } finally {
+      setDownloading(false);
     }
-
-    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) {
-        LOGE("convertInto: invalid dimensions");
-        return ERR_INVALID_DIMS;
-    }
-
-    // Validate source strides (allow negative for vertical flipping)
-    if (std::abs(srcStrideY) < srcW || 
-        std::abs(srcStrideU) < (srcW + 1) / 2 || 
-        std::abs(srcStrideV) < (srcW + 1) / 2) {
-        LOGE("convertInto: invalid source strides");
-        return ERR_INVALID_STRIDE;
-    }
-
-    // Validate source buffer capacities to prevent out-of-bounds reads.
-    const bool hasNegativeStride = (srcStrideY < 0 || srcStrideU < 0 || srcStrideV < 0);
-    if (!hasNegativeStride) {
-        jlong capY = env->GetDirectBufferCapacity(srcYBuf);
-        jlong capU = env->GetDirectBufferCapacity(srcUBuf);
-        jlong capV = env->GetDirectBufferCapacity(srcVBuf);
-        
-        const int srcHUV = (srcH + 1) / 2;
-        if (capY < (jlong)srcStrideY * srcH ||
-            capU < (jlong)srcStrideU * srcHUV ||
-            capV < (jlong)srcStrideV * srcHUV) {
-            LOGE("convertInto: source buffer(s) too small");
-            return ERR_SRC_TOO_SMALL;
-        }
-    }
-
-    // Output strides
-    const int dstStrY     = dstW;
-    const int dstStrUV    = (dstW + 1) / 2;
-    const int dstStrUV_NV = ((dstW + 1) / 2) * 2;  // Interleaved UV byte-pair stride
-
-    size_t ySize = 0, uvSize = 0;
-    getI420Sizes(dstW, dstH, ySize, uvSize);
-    const size_t i420Size = ySize + 2 * uvSize;
-
-    // Destination capacity check
-    jlong dstCap = env->GetDirectBufferCapacity(dstBuf);
-    size_t required = 0;
-    switch (dstFmt) {
-        case FMT_YUV_420_888:
-        case FMT_NV21:
-        case FMT_NV12:  required = i420Size; break;
-        case FMT_RGBA_8888: required = (size_t)dstW * dstH * 4; break;
-        case FMT_RGB_565:   required = (size_t)dstW * dstH * 2; break;
-        default:
-            LOGE("convertInto: unsupported format 0x%x", dstFmt);
-            return ERR_UNSUPPORTED_FMT;
-    }
-    
-    if (dstCap < (jlong)required) {
-        LOGE("convertInto: dst buffer too small (need %zu, got %lld)", required, (long long)dstCap);
-        return ERR_DST_TOO_SMALL;
-    }
-
-    int ret = 0;
-    const bool needsScale = (srcW != dstW || srcH != dstH);
-
-    switch (dstFmt) {
-
-    case FMT_YUV_420_888: {
-        uint8_t* dY = dst;
-        uint8_t* dU = dst + ySize;
-        uint8_t* dV = dU + uvSize;
-
-        // Ultra-fast path: exact match AND tightly packed (no padding)
-        if (!needsScale && srcStrideY == srcW && srcStrideU == (srcW + 1) / 2 && srcStrideV == (srcW + 1) / 2) {
-            std::memcpy(dY, srcY, ySize);
-            std::memcpy(dU, srcU, uvSize);
-            std::memcpy(dV, srcV, uvSize);
-            ret = 0;
-        } 
-        // Fast path: no scale, but has padding/strides
-        else if (!needsScale) {
-            ret = libyuv::I420Copy(
-                srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV, srcW, srcH,
-                dY, dstStrY, dU, dstStrUV, dV, dstStrUV, dstW, dstH);
-        } 
-        // Scale path
-        else {
-            ret = scaleI420(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
-                            srcW, srcH,
-                            dY, dstStrY, dU, dstStrUV, dV, dstStrUV,
-                            dstW, dstH);
-        }
-        break;
-    }
-
-    case FMT_NV21:
-    case FMT_NV12:
-    case FMT_RGBA_8888:
-    case FMT_RGB_565: {
-        if (!needsScale) {
-            // Fast path: Convert directly from source I420 to target format
-            switch (dstFmt) {
-            case FMT_NV21:
-                ret = libyuv::I420ToNV21(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
-                                         dst, dstStrY, dst + ySize, dstStrUV_NV, dstW, dstH);
-                break;
-            case FMT_NV12:
-                ret = libyuv::I420ToNV12(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
-                                         dst, dstStrY, dst + ySize, dstStrUV_NV, dstW, dstH);
-                break;
-            case FMT_RGBA_8888:
-                ret = libyuv::I420ToABGR(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
-                                         dst, dstW * 4, dstW, dstH);
-                break;
-            case FMT_RGB_565:
-                ret = libyuv::I420ToRGB565(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
-                                           dst, dstW * 2, dstW, dstH);
-                break;
-            }
-        } else {
-            // Scale path: Scale to I420 in a temporary buffer, then convert to target format
-            ScopedMalloc tmp(static_cast<uint8_t*>(std::malloc(i420Size)));
-            if (!tmp) {
-                LOGE("malloc failed");
-                return ERR_OOM;
-            }
-            
-            uint8_t* tmpY = tmp.get();
-            uint8_t* tmpU = tmpY + ySize;
-            uint8_t* tmpV = tmpU + uvSize;
-
-            ret = scaleI420(srcY, srcStrideY, srcU, srcStrideU, srcV, srcStrideV,
-                            srcW, srcH,
-                            tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
-                            dstW, dstH);
-
-            if (ret == 0) {
-                switch (dstFmt) {
-                case FMT_NV21:
-                    ret = libyuv::I420ToNV21(tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
-                                             dst, dstStrY, dst + ySize, dstStrUV_NV, dstW, dstH);
-                    break;
-                case FMT_NV12:
-                    ret = libyuv::I420ToNV12(tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
-                                             dst, dstStrY, dst + ySize, dstStrUV_NV, dstW, dstH);
-                    break;
-                case FMT_RGBA_8888:
-                    ret = libyuv::I420ToABGR(tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
-                                             dst, dstW * 4, dstW, dstH);
-                    break;
-                case FMT_RGB_565:
-                    ret = libyuv::I420ToRGB565(tmpY, dstStrY, tmpU, dstStrUV, tmpV, dstStrUV,
-                                               dst, dstW * 2, dstW, dstH);
-                    break;
-                }
-            }
-        }
-        break;
-    }
-
-    } // end switch
-
-    return ret;
-}
-```
-
-### STEP 5: Update the FFmpeg C++ Wrapper
-Locate `app/src/main/cpp/ffmpeg_decoder.cpp` and overwrite it with this exact fully-commented code:
-```cpp
-#include <jni.h>
-#include <android/log.h>
-#include <atomic>
-#include <thread>
-#include <string>
-#include <mutex>
-#include <chrono>
-#include <cstring>
-
-extern "C" {
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-#include <libavutil/imgutils.h>
-#include <libavutil/opt.h>
-#include <libavutil/frame.h>
-#include <libswscale/swscale.h>
-}
-
-#define LOG_TAG "FFmpegDecoder"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-
-// ── JNI global state ─────────────────────────────────────────────────────────
-
-static JavaVM*   g_jvm              = nullptr;
-static jmethodID g_onFrameAvailable = nullptr;
-static jmethodID g_onError          = nullptr;
-static jmethodID g_onEof            = nullptr;
-static bool      g_methodsCached    = false;
-
-// ── Decoder context ───────────────────────────────────────────────────────────
-
-struct DecoderCtx {
-    std::string          url;
-    std::atomic<bool>    running{true};
-    std::atomic<bool>    hotSwapping{false};
-    std::string          hotSwapUrl;
-    std::mutex           swapMu;
-    jobject              callback = nullptr;  // global JNI ref
-
-    // Thread-safe dimensions for getWidth/getHeight
-    std::atomic<int>     width{0};
-    std::atomic<int>     height{0};
-    
-    AVRational           timeBase{0, 1};
-    int                  srcFmt = -1; // Track source format for SwsContext
-
-    AVFormatContext*     fmtCtx    = nullptr;
-    AVCodecContext*      codecCtx  = nullptr;
-    SwsContext*          swsCtx    = nullptr;
-    int                  videoIdx  = -1;
-    AVFrame*             frame     = nullptr;
-    AVFrame*             frameI420 = nullptr;
-    AVPacket*            packet    = nullptr;
-
-    std::thread          thread;
-};
-
-// ── Thread attach/detach helpers ──────────────────────────────────────────────
-
-static JNIEnv* attachCurrentThread(bool& didAttach) {
-    didAttach = false;
-    JNIEnv* env = nullptr;
-    jint res = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-    if (res == JNI_EDETACHED) {
-        if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
-            didAttach = true;
-        } else {
-            env = nullptr;
-        }
-    }
-    return env;
-}
-
-static void detachCurrentThread() {
-    g_jvm->DetachCurrentThread();
-}
-
-// ── Stream open / close ───────────────────────────────────────────────────────
-
-static bool openStream(DecoderCtx* ctx) {
-    ctx->fmtCtx = avformat_alloc_context();
-    if (!ctx->fmtCtx) {
-        LOGE("avformat_alloc_context failed");
-        return false;
-    }
-
-    AVDictionary* opts = nullptr;
-    av_dict_set(&opts, "rtsp_transport",     "tcp",     0);
-    av_dict_set(&opts, "stimeout",           "5000000", 0);  // 5 s connect timeout (µs)
-    av_dict_set(&opts, "timeout",            "5000000", 0);
-    av_dict_set(&opts, "reconnect",          "1",       0);
-    av_dict_set(&opts, "reconnect_streamed", "1",       0);
-    av_dict_set(&opts, "reconnect_delay_max","5",       0);
-
-    int ret = avformat_open_input(&ctx->fmtCtx, ctx->url.c_str(), nullptr, &opts);
-    av_dict_free(&opts);
-    if (ret < 0) {
-        char err[256];
-        av_strerror(ret, err, sizeof(err));
-        LOGE("avformat_open_input: %s  url=%s", err, ctx->url.c_str());
-        avformat_free_context(ctx->fmtCtx);
-        ctx->fmtCtx = nullptr;
-        return false;
-    }
-
-    if (avformat_find_stream_info(ctx->fmtCtx, nullptr) < 0) {
-        LOGE("avformat_find_stream_info failed");
-        avformat_close_input(&ctx->fmtCtx);
-        return false;
-    }
-
-    ctx->videoIdx = av_find_best_stream(ctx->fmtCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-    if (ctx->videoIdx < 0) {
-        LOGE("no video stream found");
-        avformat_close_input(&ctx->fmtCtx);
-        return false;
-    }
-
-    AVStream*       stream = ctx->fmtCtx->streams[ctx->videoIdx];
-    const AVCodec*  codec  = avcodec_find_decoder(stream->codecpar->codec_id);
-    if (!codec) {
-        LOGE("decoder not found for codec_id=%d", stream->codecpar->codec_id);
-        avformat_close_input(&ctx->fmtCtx);
-        return false;
-    }
-
-    ctx->codecCtx = avcodec_alloc_context3(codec);
-    if (!ctx->codecCtx) {
-        LOGE("avcodec_alloc_context3 failed");
-        avformat_close_input(&ctx->fmtCtx);
-        return false;
-    }
-
-    avcodec_parameters_to_context(ctx->codecCtx, stream->codecpar);
-    ctx->codecCtx->thread_count = 2;
-    ctx->codecCtx->thread_type  = FF_THREAD_SLICE;
-
-    if (avcodec_open2(ctx->codecCtx, codec, nullptr) < 0) {
-        LOGE("avcodec_open2 failed");
-        avcodec_free_context(&ctx->codecCtx);
-        avformat_close_input(&ctx->fmtCtx);
-        return false;
-    }
-
-    ctx->frame     = av_frame_alloc();
-    ctx->frameI420 = av_frame_alloc();
-    ctx->packet    = av_packet_alloc();
-    
-    if (!ctx->frame || !ctx->frameI420 || !ctx->packet) {
-        LOGE("frame/packet alloc failed");
-        if (ctx->frame) av_frame_free(&ctx->frame);
-        if (ctx->frameI420) av_frame_free(&ctx->frameI420);
-        if (ctx->packet) av_packet_free(&ctx->packet);
-        avcodec_free_context(&ctx->codecCtx);
-        avformat_close_input(&ctx->fmtCtx);
-        return false;
-    }
-
-    // Cache thread-safe dimensions and timebase
-    ctx->width.store(ctx->codecCtx->width);
-    ctx->height.store(ctx->codecCtx->height);
-    ctx->timeBase = stream->time_base;
-    ctx->srcFmt = -1; // Force SwsContext rebuild
-
-    LOGI("stream opened: %dx%d codec=%s  url=%s",
-         ctx->codecCtx->width, ctx->codecCtx->height, codec->name, ctx->url.c_str());
-    return true;
-}
-
-static void closeStream(DecoderCtx* ctx) {
-    if (ctx->packet)    { av_packet_free(&ctx->packet);    }
-    if (ctx->frame)     { av_frame_free(&ctx->frame);      }
-    if (ctx->frameI420) { av_frame_free(&ctx->frameI420);  }
-    if (ctx->swsCtx)    { sws_freeContext(ctx->swsCtx); ctx->swsCtx = nullptr; }
-    if (ctx->codecCtx)  { avcodec_free_context(&ctx->codecCtx); }
-    if (ctx->fmtCtx)    { avformat_close_input(&ctx->fmtCtx);   }
-    
-    ctx->videoIdx = -1;
-    ctx->width.store(0);
-    ctx->height.store(0);
-    ctx->srcFmt = -1;
-}
-
-// ── Frame delivery to Kotlin ──────────────────────────────────────────────────
-
-static void fireOnFrame(JNIEnv* env, jobject cb, AVFrame* f, jlong ptsUs) {
-    const int w      = f->width;
-    const int h      = f->height;
-    const int ySize  = w * h;
-    
-    // Correct UV size calculation for odd dimensions
-    const int uvW    = (w + 1) / 2;
-    const int uvH    = (h + 1) / 2;
-    const int uvSize = uvW * uvH;
-
-    jobject yBuf = env->NewDirectByteBuffer(f->data[0], ySize);
-    jobject uBuf = env->NewDirectByteBuffer(f->data[1], uvSize);
-    jobject vBuf = env->NewDirectByteBuffer(f->data[2], uvSize);
-    if (!yBuf || !uBuf || !vBuf) { LOGE("NewDirectByteBuffer failed"); return; }
-
-    env->CallVoidMethod(cb, g_onFrameAvailable, yBuf, uBuf, vBuf,
-                        (jint)w, (jint)h, ptsUs);
-
-    env->DeleteLocalRef(yBuf);
-    env->DeleteLocalRef(uBuf);
-    env->DeleteLocalRef(vBuf);
-
-    if (env->ExceptionCheck()) {
-        LOGE("onFrameAvailable threw exception");
-        env->ExceptionClear();
-    }
-}
-
-// ── Convert decoded frame to tightly packed I420 ─────────────────────────────
-
-static AVFrame* ensureI420(DecoderCtx* ctx, AVFrame* src) {
-    const int w = src->width;
-    const int h = src->height;
-    const int srcFmt = src->format;
-
-    // Rebuild SwsContext if dimensions or format changed
-    bool needsRebuild = !ctx->swsCtx || 
-                        ctx->frameI420->width != w || 
-                        ctx->frameI420->height != h || 
-                        ctx->srcFmt != srcFmt;
-
-    if (needsRebuild) {
-        if (ctx->swsCtx) { sws_freeContext(ctx->swsCtx); ctx->swsCtx = nullptr; }
-
-        ctx->swsCtx = sws_getContext(
-            w, h, static_cast<AVPixelFormat>(srcFmt),
-            w, h, AV_PIX_FMT_YUV420P,
-            SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
-        if (!ctx->swsCtx) { LOGE("sws_getContext failed"); return nullptr; }
-
-        av_frame_unref(ctx->frameI420);
-        ctx->frameI420->format = AV_PIX_FMT_YUV420P;
-        ctx->frameI420->width  = w;
-        ctx->frameI420->height = h;
-        
-        // Allocate a tightly packed buffer to prevent stride/padding corruption
-        int ySize = w * h;
-        int uvSize = ((w + 1) / 2) * ((h + 1) / 2);
-        size_t totalSize = ySize + 2 * uvSize;
-        
-        AVBufferRef* bufRef = av_buffer_alloc(totalSize);
-        if (!bufRef) { LOGE("av_buffer_alloc failed"); return nullptr; }
-        
-        ctx->frameI420->buf[0] = bufRef;
-        ctx->frameI420->data[0] = bufRef->data;
-        ctx->frameI420->data[1] = bufRef->data + ySize;
-        ctx->frameI420->data[2] = bufRef->data + ySize + uvSize;
-        
-        // Set linesize to exact width (no padding)
-        ctx->frameI420->linesize[0] = w;
-        ctx->frameI420->linesize[1] = (w + 1) / 2;
-        ctx->frameI420->linesize[2] = (w + 1) / 2;
-        
-        ctx->srcFmt = srcFmt;
-    }
-
-    sws_scale(ctx->swsCtx,
-              src->data, src->linesize, 0, h,
-              ctx->frameI420->data, ctx->frameI420->linesize);
-    ctx->frameI420->pts = src->pts;
-    return ctx->frameI420;
-}
-
-// ── Main decode loop ──────────────────────────────────────────────────────────
-
-static void decodeLoop(DecoderCtx* ctx) {
-    bool    didAttach = false;
-    JNIEnv* env       = attachCurrentThread(didAttach);
-    if (!env) { LOGE("failed to attach decode thread to JVM"); return; }
-
-    while (ctx->running.load()) {
-
-        // ── Hot-swap ──────────────────────────────────────────────────────────
-        if (ctx->hotSwapping.load()) {
-            std::string newUrl;
-            {
-                std::lock_guard<std::mutex> lk(ctx->swapMu);
-                newUrl = ctx->hotSwapUrl;
-                ctx->hotSwapping.store(false);
-            }
-            LOGI("hot-swap → %s", newUrl.c_str());
-            closeStream(ctx);
-            ctx->url = newUrl;
-            
-            // Loop until openStream succeeds or thread is stopped
-            while (ctx->running.load() && !openStream(ctx)) {
-                LOGE("hot-swap openStream failed — retry in 2 s");
-                std::this_thread::sleep_for(std::chrono::seconds(2));
-            }
-            if (!ctx->running.load()) break;
-        }
-
-        // ── Read packet ───────────────────────────────────────────────────────
-        int ret = av_read_frame(ctx->fmtCtx, ctx->packet);
-
-        if (ret == AVERROR_EOF) {
-            env->CallVoidMethod(ctx->callback, g_onEof);
-            if (env->ExceptionCheck()) env->ExceptionClear();
-
-            // Only seek if it's not a live stream
-            bool isLive = (ctx->fmtCtx->duration == AV_NOPTS_VALUE) || 
-                          (strncmp(ctx->url.c_str(), "rtsp", 4) == 0);
-            
-            if (!isLive) {
-                avformat_seek_file(ctx->fmtCtx, -1, INT64_MIN, 0, INT64_MAX, 0);
-                avcodec_flush_buffers(ctx->codecCtx);
-            } else {
-                // Live stream ended/disconnected. Wait and reconnect.
-                std::this_thread::sleep_for(std::chrono::seconds(2));
-                closeStream(ctx);
-                while (ctx->running.load() && !openStream(ctx)) {
-                    LOGE("Live stream EOF, reconnect failed, retrying in 3s...");
-                    std::this_thread::sleep_for(std::chrono::seconds(3));
-                }
-                if (!ctx->running.load()) break;
-            }
-            continue;
-        }
-
-        if (ret == AVERROR(EAGAIN)) {
-            // EAGAIN means "try again later", not EOF
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            continue;
-        }
-
-        if (ret < 0) {
-            char errBuf[256];
-            av_strerror(ret, errBuf, sizeof(errBuf));
-            LOGE("av_read_frame: %s", errBuf);
-            jstring msg = env->NewStringUTF(errBuf);
-            env->CallVoidMethod(ctx->callback, g_onError, (jint)ret, msg);
-            env->DeleteLocalRef(msg);
-            if (env->ExceptionCheck()) env->ExceptionClear();
-
-            closeStream(ctx);
-            // Loop until reconnection succeeds
-            while (ctx->running.load() && !openStream(ctx)) {
-                LOGE("Reconnect failed, retrying in 3s...");
-                std::this_thread::sleep_for(std::chrono::seconds(3));
-            }
-            if (!ctx->running.load()) break;
-            continue;
-        }
-
-        // ── Decode video packets ──────────────────────────────────────────────
-        if (ctx->packet->stream_index == ctx->videoIdx) {
-            ret = avcodec_send_packet(ctx->codecCtx, ctx->packet);
-            av_packet_unref(ctx->packet); // Unref immediately to prevent leaks
-            
-            if (ret < 0 && ret != AVERROR(EAGAIN)) {
-                LOGE("Error sending packet: %d", ret);
-                continue;
-            }
-
-            while (ctx->running.load()) {
-                ret = avcodec_receive_frame(ctx->codecCtx, ctx->frame);
-                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
-                if (ret < 0) {
-                    LOGE("Error receiving frame: %d", ret);
-                    break;
-                }
-
-                AVFrame* outFrame = ensureI420(ctx, ctx->frame);
-                if (outFrame) {
-                    // Calculate PTS in microseconds
-                    jlong ptsUs = 0;
-                    if (outFrame->pts != AV_NOPTS_VALUE) {
-                        ptsUs = av_rescale_q(outFrame->pts, ctx->timeBase, {1, 1000000});
-                    }
-                    fireOnFrame(env, ctx->callback, outFrame, ptsUs);
-                }
-                
-                // CRITICAL: Unref the frame to prevent massive memory leaks
-                av_frame_unref(ctx->frame);
-            }
-        } else {
-            av_packet_unref(ctx->packet);
-        }
-    }
-
-    if (didAttach) detachCurrentThread();
-    LOGI("decode loop exited");
+  };
+
+  return (
+    <div
+      className="min-h-screen flex flex-col items-center px-4 py-8"
+      style={{ background: "linear-gradient(170deg, #0f0a0a 0%, #0d0f14 50%, #080b12 100%)" }}
+    >
+      {/* Trial Key Modal */}
+      {showTrialModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
+          onClick={() => setShowTrialModal(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 flex flex-col items-center gap-4"
+            style={{
+              background: "linear-gradient(135deg, rgba(20,12,40,0.99) 0%, rgba(12,8,28,0.98) 100%)",
+              border: "1px solid rgba(160,80,255,0.35)",
+              boxShadow: "0 0 60px rgba(160,80,255,0.2), 0 20px 60px rgba(0,0,0,0.8)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{
+                background: "linear-gradient(145deg, rgba(160,80,255,0.25), rgba(160,80,255,0.08))",
+                border: "1px solid rgba(160,80,255,0.4)",
+                boxShadow: "0 0 24px rgba(160,80,255,0.3)",
+              }}
+            >
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <circle cx="14" cy="14" r="12" stroke="#a050ff" strokeWidth="1.6"/>
+                <path d="M14 8v6l3.5 3.5" stroke="#a050ff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-white font-bold text-lg tracking-wide">Your Trial Key</p>
+              <p className="text-white/50 text-[12px] mt-1">Use this key to activate your 1-hour free trial</p>
+            </div>
+            <div
+              className="w-full rounded-xl px-5 py-4 flex items-center justify-between gap-3"
+              style={{ background: "rgba(160,80,255,0.08)", border: "1px solid rgba(160,80,255,0.3)" }}
+            >
+              <span
+                className="font-bold text-xl tracking-[0.25em]"
+                style={{ color: "#c080ff", textShadow: "0 0 16px rgba(160,80,255,0.7)" }}
+              >
+                NOWORNEVER
+              </span>
+              <button
+                onClick={copyKey}
+                className="shrink-0 cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95"
+                style={{ color: copied ? "#00c864" : "#a050ff" }}
+              >
+                {copied ? (
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <path d="M3 9l4 4 8-8" stroke="#00c864" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                ) : (
+                  <Copy size={18} />
+                )}
+              </button>
+            </div>
+            {copied && (
+              <p className="text-[11px] tracking-widest uppercase" style={{ color: "#00c864" }}>
+                ✓ Copied to clipboard
+              </p>
+            )}
+            <button
+              onClick={() => setShowTrialModal(false)}
+              className="w-full py-3 rounded-xl font-bold text-[13px] tracking-widest uppercase cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] mt-1"
+              style={{
+                background: "linear-gradient(135deg, rgba(160,80,255,0.25), rgba(120,50,220,0.15))",
+                border: "1px solid rgba(160,80,255,0.35)",
+                color: "#c080ff",
+                boxShadow: "0 0 20px rgba(160,80,255,0.15)",
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Back button */}
+      <div className="w-full max-w-md mb-6">
+        <button className="flex items-center gap-2 text-white/80 hover:text-white text-base font-medium cursor-pointer transition-colors">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M12 4L6 10L12 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Back
+        </button>
+      </div>
+
+      {/* Shield warning icon */}
+      <div className="mb-5 relative flex items-center justify-center">
+        <div className="absolute w-24 h-24 rounded-full bg-red-500/10 blur-xl" />
+        <div className="absolute w-16 h-16 rounded-full bg-red-500/15 blur-md" />
+        <div className="relative z-10 w-16 h-16 rounded-full bg-red-950/60 border border-red-800/50 flex items-center justify-center shadow-[0_0_30px_rgba(239,68,68,0.3)]">
+          <ShieldAlert size={32} className="text-red-500" strokeWidth={1.8} />
+        </div>
+      </div>
+
+      <h1
+        className="font-bold text-center text-base tracking-widest uppercase mb-1"
+        style={{ color: "#ff4444", textShadow: "0 0 20px rgba(255,68,68,0.5)" }}
+      >
+        STOP: READ BEFORE PROCEEDING
+      </h1>
+      <p className="text-gray-500 text-[11px] tracking-[0.3em] uppercase mb-7">
+        THREAT DETECTED
+      </p>
+
+      {/* Warning card */}
+      <div
+        className="w-full max-w-md rounded-2xl p-4 mb-6 space-y-3"
+        style={{
+          background: "linear-gradient(135deg, rgba(40,10,10,0.95) 0%, rgba(26,10,10,0.9) 100%)",
+          border: "1px solid rgba(180,30,30,0.4)",
+          boxShadow: "0 0 40px rgba(180,0,0,0.12), inset 0 1px 0 rgba(255,80,80,0.08)",
+        }}
+      >
+        <p className="text-white/90 text-sm text-center font-medium">
+          Scammers are circulating infected FaceGate apps.
+        </p>
+        <div
+          className="flex items-start gap-3 rounded-xl px-4 py-3"
+          style={{ background: "rgba(60,15,15,0.8)", border: "1px solid rgba(200,50,50,0.25)" }}
+        >
+          <AlertTriangle size={17} className="text-yellow-400 mt-0.5 shrink-0" />
+          <p className="text-white/85 text-[13px] leading-relaxed">
+            DO NOT INSTALL PC VERSIONS.{" "}
+            <span className="font-bold text-white">FaceGate.exe / Kima.exe / .msi</span>{" "}
+            files are VIRUSES.
+          </p>
+        </div>
+        <div
+          className="rounded-xl px-4 py-3"
+          style={{
+            background: "rgba(5,25,40,0.9)",
+            border: "1px solid rgba(0,160,200,0.3)",
+            boxShadow: "inset 0 0 20px rgba(0,180,255,0.05)",
+          }}
+        >
+          <p className="text-cyan-400 text-[13px] leading-relaxed">
+            UPDATES are broadcast through the official FaceGate bot only.
+          </p>
+        </div>
+      </div>
+
+      {/* Module Download Card */}
+      <div
+        className="w-full max-w-md rounded-2xl p-4 mb-6"
+        style={{
+          background: "linear-gradient(135deg, rgba(5,15,30,0.98) 0%, rgba(5,12,24,0.95) 100%)",
+          border: "1px solid rgba(0,170,255,0.25)",
+          boxShadow: "0 0 40px rgba(0,150,255,0.08), inset 0 1px 0 rgba(0,180,255,0.08)",
+        }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{
+              background: "linear-gradient(145deg, rgba(0,170,255,0.2), rgba(0,170,255,0.06))",
+              border: "1px solid rgba(0,170,255,0.4)",
+              boxShadow: "0 0 16px rgba(0,170,255,0.2)",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <rect x="1" y="2" width="16" height="14" rx="2" stroke="#00aaff" strokeWidth="1.3" strokeOpacity="0.85"/>
+              <line x1="1" y1="7" x2="17" y2="7" stroke="#00aaff" strokeWidth="1" strokeOpacity="0.4"/>
+              <circle cx="3.8" cy="4.5" r="0.7" fill="#00aaff" fillOpacity="0.5"/>
+              <circle cx="6.3" cy="4.5" r="0.7" fill="#00aaff" fillOpacity="0.35"/>
+              <path d="M4 10.5l2.5 2L4 14" stroke="#00aaff" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.9"/>
+              <line x1="8" y1="13" x2="13" y2="13" stroke="#00aaff" strokeWidth="1.3" strokeLinecap="round" strokeOpacity="0.6"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-white font-bold text-[13px] tracking-wide">Module Installation</p>
+            <p className="text-[10px] tracking-widest uppercase" style={{ color: "#00aaff", textShadow: "0 0 10px rgba(0,170,255,0.5)" }}>
+              ● Magisk / KernelSU / Apatch
+            </p>
+          </div>
+          <div className="ml-auto">
+            <span
+              className="text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full"
+              style={{
+                color: "#00aaff",
+                background: "rgba(0,170,255,0.12)",
+                border: "1px solid rgba(0,170,255,0.3)",
+              }}
+            >
+              MODULE
+            </span>
+          </div>
+        </div>
+        <div className="h-px mb-3" style={{ background: "rgba(0,170,255,0.1)" }} />
+        <div
+          className="rounded-xl px-4 py-3 mb-3 space-y-2.5"
+          style={{ background: "rgba(0,170,255,0.05)", border: "1px solid rgba(0,170,255,0.12)" }}
+        >
+          {[
+            { step: "1", text: "Download the FaceGate module below" },
+            { step: "2", text: "Open Magisk, KernelSU, or Apatch on your device" },
+            { step: "3", text: 'Tap "Install from storage" and select the module' },
+            { step: "4", text: "Reboot your device to activate FaceGate" },
+          ].map(({ step, text }) => (
+            <div key={step} className="flex items-start gap-3">
+              <span
+                className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5"
+                style={{
+                  background: "rgba(0,170,255,0.15)",
+                  border: "1px solid rgba(0,170,255,0.4)",
+                  color: "#00aaff",
+                }}
+              >
+                {step}
+              </span>
+              <p className="text-white/75 text-[12px] leading-relaxed">{text}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {["Magisk", "KernelSU", "Apatch"].map((tool) => (
+            <span
+              key={tool}
+              className="text-[10px] font-bold tracking-wider px-2.5 py-1 rounded-lg"
+              style={{
+                color: "#00aaff",
+                background: "rgba(0,170,255,0.1)",
+                border: "1px solid rgba(0,170,255,0.25)",
+              }}
+            >
+              {tool}
+            </span>
+          ))}
+        </div>
+        {downloadError && (
+          <div
+            className="rounded-xl px-4 py-2.5 mb-3 flex items-center gap-2"
+            style={{ background: "rgba(255,60,60,0.08)", border: "1px solid rgba(255,60,60,0.25)" }}
+          >
+            <AlertTriangle size={13} className="text-red-400 shrink-0" />
+            <p className="text-red-400 text-[11px]">{downloadError}</p>
+          </div>
+        )}
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="w-full py-3 rounded-xl font-bold text-[13px] tracking-widest uppercase cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          style={{
+            background: downloadDone
+              ? "linear-gradient(135deg, rgba(0,200,100,0.3), rgba(0,160,80,0.2))"
+              : "linear-gradient(135deg, rgba(0,170,255,0.3), rgba(0,120,220,0.2))",
+            border: downloadDone ? "1px solid rgba(0,200,100,0.45)" : "1px solid rgba(0,170,255,0.45)",
+            color: downloadDone ? "#00c864" : "#40ccff",
+            boxShadow: downloadDone
+              ? "0 0 24px rgba(0,200,100,0.2)"
+              : "0 0 24px rgba(0,170,255,0.2), inset 0 1px 0 rgba(100,200,255,0.15)",
+            textShadow: downloadDone ? "0 0 12px rgba(0,200,100,0.8)" : "0 0 12px rgba(0,170,255,0.8)",
+          }}
+        >
+          {downloading ? (
+            <>
+              <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.3"/>
+                <path d="M8 2a6 6 0 0 1 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              Downloading...
+            </>
+          ) : downloadDone ? (
+            <>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2 8l4 4 8-8" stroke="#00c864" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Downloaded!
+            </>
+          ) : (
+            <>
+              <Download size={15} />
+              Download Module
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Trial Card */}
+      <div
+        className="w-full max-w-md rounded-2xl p-4 mb-6"
+        style={{
+          background: "linear-gradient(135deg, rgba(15,10,30,0.98) 0%, rgba(10,8,25,0.95) 100%)",
+          border: "1px solid rgba(160,80,255,0.25)",
+          boxShadow: "0 0 40px rgba(140,60,255,0.08), inset 0 1px 0 rgba(180,100,255,0.08)",
+        }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{
+              background: "linear-gradient(145deg, rgba(160,80,255,0.25), rgba(160,80,255,0.08))",
+              border: "1px solid rgba(160,80,255,0.4)",
+              boxShadow: "0 0 16px rgba(160,80,255,0.25)",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="7.5" stroke="#a050ff" strokeWidth="1.4"/>
+              <path d="M9 5v4l2.5 2.5" stroke="#a050ff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-white font-bold text-[13px] tracking-wide">Free Trial Available</p>
+            <p className="text-[10px] tracking-widest uppercase" style={{ color: "#a050ff", textShadow: "0 0 10px rgba(160,80,255,0.5)" }}>
+              ● 1 Hour Free Access
+            </p>
+          </div>
+          <div className="ml-auto">
+            <span
+              className="text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full"
+              style={{
+                color: "#a050ff",
+                background: "rgba(160,80,255,0.12)",
+                border: "1px solid rgba(160,80,255,0.3)",
+              }}
+            >
+              FREE
+            </span>
+          </div>
+        </div>
+        <div className="h-px mb-3" style={{ background: "rgba(160,80,255,0.1)" }} />
+        <div
+          className="rounded-xl px-4 py-3 mb-3"
+          style={{ background: "rgba(160,80,255,0.06)", border: "1px solid rgba(160,80,255,0.15)" }}
+        >
+          <p className="text-white/80 text-[13px] leading-relaxed text-center">
+            Try <span className="font-bold text-white">FaceGate</span> free for{" "}
+            <span className="font-bold" style={{ color: "#a050ff" }}>1 hour</span> before committing to a purchase. Full access, no limitations.
+          </p>
+        </div>
+        {[
+          "Full access to all FaceGate features",
+          "No payment required to start",
+          "Upgrade anytime during or after trial",
+        ].map((text) => (
+          <div key={text} className="flex items-center gap-3 py-1.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+              <circle cx="7" cy="7" r="6" fill="rgba(160,80,255,0.15)" stroke="rgba(160,80,255,0.4)" strokeWidth="1"/>
+              <path d="M4.5 7l2 2 3-3" stroke="#a050ff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <p className="text-white/70 text-[12px]">{text}</p>
+          </div>
+        ))}
+        <button
+          onClick={() => setShowTrialModal(true)}
+          className="w-full mt-4 py-3 rounded-xl font-bold text-[13px] tracking-widest uppercase cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+          style={{
+            background: "linear-gradient(135deg, rgba(160,80,255,0.3), rgba(120,50,220,0.2))",
+            border: "1px solid rgba(160,80,255,0.45)",
+            color: "#c080ff",
+            boxShadow: "0 0 24px rgba(160,80,255,0.2), inset 0 1px 0 rgba(200,140,255,0.15)",
+            textShadow: "0 0 12px rgba(160,80,255,0.8)",
+          }}
+        >
+          Start 1-Hour Free Trial
+        </button>
+      </div>
+
+      {/* App Integrity Card */}
+      <div
+        className="w-full max-w-md rounded-2xl p-4 mb-6"
+        style={{
+          background: "linear-gradient(135deg, rgba(5,25,15,0.98) 0%, rgba(5,20,12,0.95) 100%)",
+          border: "1px solid rgba(0,200,100,0.25)",
+          boxShadow: "0 0 40px rgba(0,200,100,0.08), inset 0 1px 0 rgba(0,255,120,0.08)",
+        }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{
+              background: "linear-gradient(145deg, rgba(0,200,100,0.2), rgba(0,200,100,0.06))",
+              border: "1px solid rgba(0,200,100,0.35)",
+              boxShadow: "0 0 16px rgba(0,200,100,0.2)",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 1L2 4v5c0 4.1 2.9 7.9 7 9 4.1-1.1 7-4.9 7-9V4L9 1z" stroke="#00c864" strokeWidth="1.4" fill="rgba(0,200,100,0.1)" strokeLinejoin="round"/>
+              <path d="M6 9l2 2 4-4" stroke="#00c864" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-white font-bold text-[13px] tracking-wide">App Integrity Verified</p>
+            <p className="text-[10px] tracking-widest uppercase" style={{ color: "#00c864", textShadow: "0 0 10px rgba(0,200,100,0.5)" }}>
+              ● Untampered
+            </p>
+          </div>
+          <div className="ml-auto">
+            <span
+              className="text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full"
+              style={{
+                color: "#00c864",
+                background: "rgba(0,200,100,0.12)",
+                border: "1px solid rgba(0,200,100,0.3)",
+              }}
+            >
+              SECURE
+            </span>
+          </div>
+        </div>
+        <div className="h-px mb-3" style={{ background: "rgba(0,200,100,0.1)" }} />
+        {[
+          "Digital signature matches official release",
+          "No unauthorized modifications detected",
+          "Checksum verified against official build",
+        ].map((text) => (
+          <div key={text} className="flex items-center gap-3 py-1.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+              <circle cx="7" cy="7" r="6" fill="rgba(0,200,100,0.15)" stroke="rgba(0,200,100,0.4)" strokeWidth="1"/>
+              <path d="M4.5 7l2 2 3-3" stroke="#00c864" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <p className="text-white/70 text-[12px]">{text}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Divider */}
+      <div className="w-full max-w-md flex items-center gap-3 mb-5">
+        <div className="flex-1 h-px bg-white/5" />
+        <span className="text-white/20 text-[10px] tracking-widest uppercase">Official Links</span>
+        <div className="flex-1 h-px bg-white/5" />
+      </div>
+
+      {/* Official links */}
+      <div className="w-full max-w-md space-y-3">
+        {LINKS.map((link, i) => (
+          <button
+            key={link.label}
+            onClick={() => window.open(link.url, "_blank", "noopener,noreferrer")}
+            className="group w-full flex items-center gap-5 rounded-2xl px-5 py-5 cursor-pointer transition-all duration-200 hover:scale-[1.015] active:scale-[0.99]"
+            style={{
+              background: `linear-gradient(135deg, rgba(24,28,38,0.98) 0%, rgba(18,22,32,0.95) 100%)`,
+              border: `1px solid ${link.color}33`,
+              boxShadow: `0 4px 28px rgba(0,0,0,0.45), inset 0 1px 0 ${link.color}18, inset 0 -1px 0 rgba(0,0,0,0.3)`,
+              animationDelay: `${i * 80}ms`,
+            }}
+          >
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-200"
+              style={{
+                background: `linear-gradient(145deg, ${link.color}20, ${link.color}08)`,
+                border: `1px solid ${link.color}40`,
+                boxShadow: `0 0 20px ${link.color}25, inset 0 1px 0 ${link.color}30`,
+              }}
+            >
+              <TerminalIcon color={link.color} />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-white font-bold text-[15px] tracking-wide">
+                {link.icon} {link.label}
+              </p>
+              <span
+                className="inline-block text-[10px] font-bold tracking-widest uppercase mt-1.5 px-2.5 py-1 rounded-full"
+                style={{
+                  color: link.color,
+                  background: `${link.color}15`,
+                  border: `1px solid ${link.color}35`,
+                  textShadow: `0 0 10px ${link.color}80`,
+                }}
+              >
+                {link.tag}
+              </span>
+            </div>
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:shadow-lg shrink-0"
+              style={{
+                background: `linear-gradient(135deg, ${link.color}25, ${link.color}10)`,
+                border: `1px solid ${link.color}40`,
+                boxShadow: `0 0 12px ${link.color}20`,
+              }}
+            >
+              <ChevronRight size={16} style={{ color: link.color }} />
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <p className="mt-8 text-white/15 text-[10px] tracking-widest uppercase text-center">
+        Always verify sources before downloading
+      </p>
+    </div>
+  );
 }
 
-// ── JNI Method Caching ────────────────────────────────────────────────────────
 
-static bool cacheMethods(JNIEnv* env) {
-    if (g_methodsCached) return true;
-    
-    // Lazy initialization to avoid FindClass trap in JNI_OnLoad
-    jclass cls = env->FindClass("com/itsme/amkush/ffmpeg/FFmpegDecoder$FrameCallback");
-    if (!cls) { LOGE("FrameCallback class not found"); return false; }
 
-    g_onFrameAvailable = env->GetMethodID(cls, "onFrameAvailable",
-        "(Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;IIJ)V");
-    g_onError = env->GetMethodID(cls, "onError", "(ILjava/lang/String;)V");
-    g_onEof   = env->GetMethodID(cls, "onEof",   "()V");
 
-    env->DeleteLocalRef(cls);
 
-    if (!g_onFrameAvailable || !g_onError || !g_onEof) {
-        LOGE("FrameCallback method ID lookup failed");
-        return false;
-    }
-    
-    g_methodsCached = true;
-    LOGI("JNI methods cached OK");
-    return true;
-}
 
-// ── Exported JNI functions ────────────────────────────────────────────────────
 
-extern "C" {
 
-JNIEXPORT jlong JNICALL
-Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_open(
-    JNIEnv* env, jclass, jstring urlJ, jobject cb)
-{
-    if (!cacheMethods(env)) return 0L;
 
-    const char* urlC = env->GetStringUTFChars(urlJ, nullptr);
-    std::string url(urlC);
-    env->ReleaseStringUTFChars(urlJ, urlC);
+my flask server code is this...add the download endpoint so that i will create a website with where i will upload the zip to be downloaded from
 
-    auto* ctx       = new DecoderCtx();
-    ctx->url        = url;
-    ctx->callback   = env->NewGlobalRef(cb);
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+FaceGate Activation Server — Hardened Edition
+==============================================
 
-    if (!openStream(ctx)) {
-        LOGE("openStream failed: %s", url.c_str());
-        env->DeleteGlobalRef(ctx->callback);
-        delete ctx;
-        return 0L;
-    }
+SECURITY MODEL
+--------------
+1. HMAC-signed responses — every response is wrapped in a signed envelope.
+   A MITM cannot flip ok/access fields without knowing RESPONSE_HMAC_SECRET,
+   which is baked into the APK (not transmitted over the wire).
 
-    ctx->thread = std::thread(decodeLoop, ctx);
-    LOGI("decoder opened handle=%p  url=%s", ctx, url.c_str());
-    return reinterpret_cast<jlong>(ctx);
-}
+2. Trial re-use prevention — trial is bound to THREE independent fingerprints:
+     • device_id   — the app-generated ID (changes if app data is cleared)
+     • android_id  — Android Settings.Secure.ANDROID_ID (survives reinstall,
+                     persists until factory reset)
+     • wifi_bssid  — MAC address of the connected router (not the IP, which
+                     changes). Blocks a different device on the same WiFi.
+   A trial is blocked if ANY of those three matches a previous trial.
 
-JNIEXPORT void JNICALL
-Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_close(
-    JNIEnv* env, jclass, jlong handle)
-{
-    auto* ctx = reinterpret_cast<DecoderCtx*>(handle);
-    if (!ctx) return;
+3. Server-side trial timer — the server owns started_at / expires_at.
+   App calls /api/heartbeat every 60 s; server replies with
+   remaining_seconds (authoritative) and destruct: true when time is up.
+   App never trusts its own local clock for trial state.
 
-    ctx->running.store(false);
-    if (ctx->thread.joinable()) ctx->thread.join();
+4. Paid licences — permanent per device. Once device_id + token_hash are
+   stored in device_activations the device has access forever, regardless
+   of whether the key is later exhausted on other devices.
+   The only revocation is clearing app data (changes device_id).
 
-    closeStream(ctx);
-    if (ctx->callback) env->DeleteGlobalRef(ctx->callback);
-    delete ctx;
-    LOGI("decoder closed");
-}
+5. Replay protection — every request carries a client-generated rid (UUID).
+   The server echoes rid inside the signed payload. The app rejects any
+   response where rid ≠ what it sent, or where timestamp is >5 minutes old.
 
-JNIEXPORT jboolean JNICALL
-Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_hotSwap(
-    JNIEnv* env, jclass, jlong handle, jstring urlJ)
-{
-    auto* ctx = reinterpret_cast<DecoderCtx*>(handle);
-    if (!ctx) return JNI_FALSE;
+DEPLOYMENT CHECKLIST
+--------------------
+• Set FACEGATE_HMAC_SECRET env var to a long random string.
+  Bake the SAME value into the APK as a compile-time constant.
+• Set FACEGATE_ADMIN_KEY env var.
+• Run behind gunicorn/uwsgi, not Flask dev server.
+• Use HTTPS on your domain (not for pinning, just for basic transport).
+"""
 
-    const char* urlC = env->GetStringUTFChars(urlJ, nullptr);
-    {
-        std::lock_guard<std::mutex> lk(ctx->swapMu);
-        ctx->hotSwapUrl = urlC;
-        ctx->hotSwapping.store(true);
-    }
-    env->ReleaseStringUTFChars(urlJ, urlC);
-    return JNI_TRUE;
-}
+import hmac
+import hashlib
+import secrets
+import sqlite3
+import uuid
+import json
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
-JNIEXPORT jint JNICALL
-Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_getWidth(JNIEnv*, jclass, jlong handle) {
-    auto* ctx = reinterpret_cast<DecoderCtx*>(handle);
-    return ctx ? ctx->width.load() : 0;
-}
+from flask import Flask, request, jsonify, abort
+from flask_cors import CORS
 
-JNIEXPORT jint JNICALL
-Java_com_itsme_amkush_ffmpeg_FFmpegDecoder_getHeight(JNIEnv*, jclass, jlong handle) {
-    auto* ctx = reinterpret_cast<DecoderCtx*>(handle);
-    return ctx ? ctx->height.load() : 0;
-}
+app = Flask(__name__)
+CORS(app)
 
-} // extern "C"
-```
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIG  — set via environment variables on your server
+# ─────────────────────────────────────────────────────────────────────────────
 
-### STEP 6: Update the Kotlin Wrappers
-Locate the existing `LibYuv.kt` and `FFmpegDecoder.kt` files in my project. Overwrite them with these exact fully-commented contents.
+# Bake this EXACT same string into your APK as a constant (not a network call).
+# The APK uses it to verify the HMAC on every server response.
+RESPONSE_HMAC_SECRET: str = os.environ.get(
+    "FACEGATE_HMAC_SECRET",
+    "CHANGE_THIS_TO_64_RANDOM_CHARS_BEFORE_DEPLOYING_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+)
 
-**For `LibYuv.kt`:**
-```kotlin
-package com.itsme.amkush.libyuv
+# Protect admin endpoints.
+ADMIN_KEY: str = os.environ.get("FACEGATE_ADMIN_KEY", "change-this-admin-key-too")
 
-import android.graphics.ImageFormat
-import java.nio.ByteBuffer
+TRIAL_HOURS: int = 1          # how long a trial lasts
+DB_PATH: str     = "facegate.db"
 
-/**
- * JNI bridge to libyuv_wrapper.so
- *
- * Provides I420 scaling and format conversion for the SurfaceRouter hot path.
- * All methods operate on pre-allocated DirectByteBuffers — zero JVM heap
- * allocation in the frame-push loop.
- */
-object LibYuv {
 
-    init {
-        System.loadLibrary("libyuv_wrapper")
-    }
+# ─────────────────────────────────────────────────────────────────────────────
+# DATABASE
+# ─────────────────────────────────────────────────────────────────────────────
 
-    // ── Error Codes (Must match C++ side exactly) ─────────────────────────────
-    const val ERR_NULL_BUFFER     = -1
-    const val ERR_UNSUPPORTED_FMT = -2
-    const val ERR_DST_TOO_SMALL   = -3
-    const val ERR_INVALID_DIMS    = -4
-    const val ERR_INVALID_STRIDE  = -5
-    const val ERR_SRC_TOO_SMALL   = -6
-    const val ERR_OOM             = -7
+def get_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
 
-    /**
-     * Scale I420 source planes to [dstW]×[dstH] and convert to [dstFmt],
-     * writing the result into the pre-allocated DirectByteBuffer [dst].
-     */
-    external fun convertInto(
-        srcY: ByteBuffer,
-        srcU: ByteBuffer,
-        srcV: ByteBuffer,
-        srcW: Int,
-        srcH: Int,
-        srcStrideY: Int,
-        srcStrideU: Int,
-        srcStrideV: Int,
-        dstW: Int,
-        dstH: Int,
-        dstFmt: Int,
-        dst: ByteBuffer
-    ): Int
 
-    /**
-     * Compute the exact required byte size for [format] at [width]×[height].
-     */
-    fun outputSize(width: Int, height: Int, format: Int): Int {
-        require(width > 0 && height > 0) { "Dimensions must be positive" }
-        
-        val ySize = width * height
-        
-        return when (format) {
-            ImageFormat.RGBA_8888 -> ySize * 4
-            ImageFormat.RGB_565 -> ySize * 2
-            
-            ImageFormat.NV16 -> {
-                // YUV 4:2:2 - Chroma is subsampled horizontally, but NOT vertically
-                val uvSize = ((width + 1) / 2) * height
-                ySize + 2 * uvSize
-            }
-            
-            ImageFormat.NV21,
-            ImageFormat.YUV_420_888,
-            0x15 /* NV12 */ -> {
-                // YUV 4:2:0 - Chroma is subsampled both horizontally and vertically
-                val uvSize = ((width + 1) / 2) * ((height + 1) / 2)
-                ySize + 2 * uvSize
-            }
-            
-            else -> {
-                // Fallback for other YUV 4:2:0 formats
-                val uvSize = ((width + 1) / 2) * ((height + 1) / 2)
-                ySize + 2 * uvSize
-            }
-        }
-    }
-    
-    /**
-     * Helper to translate native error codes into readable strings.
-     */
-    fun getErrorMessage(code: Int): String = when (code) {
-        ERR_NULL_BUFFER -> "Null DirectByteBuffer address"
-        ERR_UNSUPPORTED_FMT -> "Unsupported destination format"
-        ERR_DST_TOO_SMALL -> "Destination buffer is too small"
-        ERR_INVALID_DIMS -> "Invalid width/height dimensions"
-        ERR_INVALID_STRIDE -> "Source strides are smaller than widths"
-        ERR_SRC_TOO_SMALL -> "Source buffers are too small for declared strides"
-        ERR_OOM -> "Out of memory (malloc failed)"
-        else -> "Unknown native error: $code"
-    }
-}
-```
+def init_db() -> None:
+    conn = get_db()
+    c = conn.cursor()
 
-**For `FFmpegDecoder.kt`:**
-```kotlin
-package com.itsme.amkush.ffmpeg
-
-import androidx.annotation.Keep
-import java.nio.ByteBuffer
-
-/**
- * JNI bridge to ffmpeg_decoder.so
- *
- * Wraps a native AVFormatContext + AVCodecContext decode loop.
- * Each open() call starts a background native thread that reads/decodes
- * the stream and calls FrameCallback.onFrameAvailable() for every I420 frame.
- */
-@Keep
-object FFmpegDecoder {
-
-    /**
-     * Callback fired on the native decode thread for each decoded video frame.
-     *
-     * IMPORTANT: Do NOT retain references to yBuf / uBuf / vBuf beyond this
-     * call — they are DirectByteBuffers backed by AVFrame native memory that
-     * is reused (or freed) as soon as onFrameAvailable() returns.
-     * Copy the bytes if you need to hold them.
-     */
-    @Keep
-    interface FrameCallback {
-        fun onFrameAvailable(
-            yBuf: ByteBuffer,
-            uBuf: ByteBuffer,
-            vBuf: ByteBuffer,
-            width: Int,
-            height: Int,
-            ptsUs: Long
+    # License keys (paid + trial marker)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS activation_keys (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            key         TEXT UNIQUE NOT NULL,
+            max_devices INTEGER NOT NULL DEFAULT 1,
+            used_count  INTEGER NOT NULL DEFAULT 0,
+            is_trial    INTEGER NOT NULL DEFAULT 0,
+            status      TEXT    NOT NULL DEFAULT 'unused',
+            created_at  TEXT    NOT NULL,
+            updated_at  TEXT    NOT NULL
         )
-        fun onError(code: Int, msg: String)
-        fun onEof()
-    }
+    """)
 
-    init {
-        System.loadLibrary("ffmpeg_decoder")
-    }
+    # One row per (key, device) activation — stores full device fingerprint
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS device_activations (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            key_id       INTEGER NOT NULL,
+            device_id    TEXT    NOT NULL,
+            android_id   TEXT,
+            wifi_bssid   TEXT,
+            wifi_ip      TEXT,
+            build_fp     TEXT,
+            token_hash   TEXT    NOT NULL,
+            activated_at TEXT    NOT NULL,
+            last_seen    TEXT    NOT NULL,
+            FOREIGN KEY (key_id) REFERENCES activation_keys(id),
+            UNIQUE (key_id, device_id)
+        )
+    """)
 
-    @JvmStatic external fun open(url: String, cb: FrameCallback): Long
-    @JvmStatic external fun close(handle: Long)
-    @JvmStatic external fun hotSwap(handle: Long, url: String): Boolean
-    @JvmStatic external fun getWidth(handle: Long): Int
-    @JvmStatic external fun getHeight(handle: Long): Int
-}
-```
+    # One row per trial attempt — never deleted so history is permanent
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS trial_usage (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id       TEXT NOT NULL,
+            android_id      TEXT,
+            wifi_bssid      TEXT,
+            wifi_ip         TEXT,
+            build_fp        TEXT,
+            started_at      TEXT NOT NULL,
+            expires_at      TEXT NOT NULL,
+            is_active       INTEGER NOT NULL DEFAULT 1,
+            last_heartbeat  TEXT
+        )
+    """)
 
-### STEP 7: Update app/build.gradle.kts
-Locate `app/build.gradle.kts` and completely overwrite it with this exact code to remove the obsolete libyuv.dir logic:
-```kotlin
-import java.util.Properties
+    # Indexes for fast fingerprint lookups
+    c.execute("CREATE INDEX IF NOT EXISTS idx_trial_device    ON trial_usage(device_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_trial_android   ON trial_usage(android_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_trial_bssid     ON trial_usage(wifi_bssid)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_da_device       ON device_activations(device_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_da_token        ON device_activations(token_hash)")
 
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-}
+    conn.commit()
+    conn.close()
+    print("✅ Database initialised")
 
-// ── Read local.properties (for ffmpeg.dir only) ──────────────────────────────
-val localProps = Properties().also { props ->
-    rootProject.file("local.properties").takeIf { it.exists() }
-        ?.inputStream()?.use { props.load(it) }
-}
 
-val ffmpegDir: String? = localProps.getProperty("ffmpeg.dir")
-    ?: System.getenv("FFMPEG_ROOT")
+# ─────────────────────────────────────────────────────────────────────────────
+# TIME HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
 
-android {
-    namespace  = "com.itsme.amkush"
-    compileSdk = 35
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
-    defaultConfig {
-        applicationId = "com.itsme.amkush"
-        minSdk        = 29
-        targetSdk     = 35
-        versionCode   = 2
-        versionName   = "2.0"
+def _now_iso() -> str:
+    return _now().isoformat()
 
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+def _parse_iso(s: str) -> Optional[datetime]:
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CRYPTO HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _hmac_hex(key: str, message: str) -> str:
+    return hmac.new(
+        key.encode("utf-8"),
+        message.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+
+
+def _derive_token(device_id: str, key_id: int, key_text: str) -> str:
+    """
+    Deterministically derive a token for (device, activation_key).
+    The same device re-activating the same key always gets the same token.
+    This is intentional — it lets the app re-activate after a reinstall
+    on the same device_id without consuming another slot.
+    """
+    raw = f"facegate:paid:{device_id}:{key_id}:{key_text}"
+    return _hmac_hex(RESPONSE_HMAC_SECRET, raw)
+
+
+def _hash_token(token: str) -> str:
+    """One-way hash stored in DB so the raw token is never at rest."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _sign_response(payload: dict, rid: str) -> dict:
+    """
+    Wrap payload in a signed envelope.
+
+    Envelope structure:
+        {
+            "p":   { ...payload... },
+            "t":   "2024-...",        # server UTC timestamp ISO-8601
+            "rid": "<echoed rid>",    # must match what client sent
+            "n":   "<16-byte hex>",   # random nonce
+            "s":   "<sha256 hmac>"    # signature (see below)
         }
 
-        externalNativeBuild {
-            cmake {
-                cppFlags += listOf("-std=c++14", "-frtti", "-fexceptions")
-                val args = mutableListOf<String>()
-                
-                if (!ffmpegDir.isNullOrEmpty()) {
-                    args += "-DFFMPEG_ROOT=$ffmpegDir"
-                } else {
-                    println("WARNING: ffmpeg.dir not set in local.properties.")
-                    println("         Set ffmpeg.dir to your FFmpeg Android prebuilt root.")
-                }
-                
-                if (args.isNotEmpty()) arguments(*args.toTypedArray())
+    Signature input:
+        SHA256( canonical_json(p) ) + "." + t + "." + rid + "." + n
+
+    App verification steps (MUST ALL PASS before trusting p):
+        1. Assert response["rid"] == rid you sent in request
+        2. Assert abs(now - parse(response["t"])) < 300 seconds
+        3. Recompute: ph = SHA256(json(p, sorted, no-spaces))
+           canonical  = ph + "." + t + "." + rid + "." + n
+           expected_s = HMAC-SHA256(RESPONSE_HMAC_SECRET, canonical)
+        4. Assert response["s"] == expected_s  (constant-time compare)
+        5. Only now read response["p"]
+    """
+    ts    = _now_iso()
+    nonce = secrets.token_hex(16)
+
+    payload_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    payload_hash  = hashlib.sha256(payload_bytes).hexdigest()
+    canonical     = f"{payload_hash}.{ts}.{rid}.{nonce}"
+    sig           = _hmac_hex(RESPONSE_HMAC_SECRET, canonical)
+
+    return {"p": payload, "t": ts, "rid": rid, "n": nonce, "s": sig}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REQUEST HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _fp(data: dict) -> dict:
+    """Extract all device fingerprint fields from a request body."""
+    return {
+        "device_id":  (data.get("device_id")  or "").strip(),
+        "android_id": (data.get("android_id") or "").strip(),
+        # BSSID = MAC address of the WiFi router — much harder to spoof than IP
+        "wifi_bssid": (data.get("wifi_bssid") or "").strip().upper(),
+        "wifi_ip":    (data.get("wifi_ip")    or "").strip(),
+        "build_fp":   (data.get("build_fp")   or "").strip(),
+    }
+
+
+def _err(msg: str, rid: str, code: int = 400):
+    return jsonify(_sign_response({"ok": False, "reason": msg}, rid)), code
+
+
+def _require_admin():
+    if request.headers.get("X-Admin-Key", "") != ADMIN_KEY:
+        abort(403)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TRIAL LOGIC
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _trial_fingerprint_used(c: sqlite3.Cursor, fp: dict) -> bool:
+    """
+    Returns True if ANY fingerprint matches a previous trial — active or expired.
+    Rows are never deleted so history is permanent.
+
+    Checks independently:
+      • device_id   — same install
+      • android_id  — same physical device (survives app-data clear)
+      • wifi_bssid  — same router (blocks a friend on same network)
+    """
+    if fp["device_id"]:
+        c.execute("SELECT 1 FROM trial_usage WHERE device_id = ? LIMIT 1",
+                  (fp["device_id"],))
+        if c.fetchone():
+            return True
+
+    if fp["android_id"]:
+        c.execute("SELECT 1 FROM trial_usage WHERE android_id = ? LIMIT 1",
+                  (fp["android_id"],))
+        if c.fetchone():
+            return True
+
+    if fp["wifi_bssid"]:
+        c.execute("SELECT 1 FROM trial_usage WHERE wifi_bssid = ? LIMIT 1",
+                  (fp["wifi_bssid"],))
+        if c.fetchone():
+            return True
+
+    return False
+
+
+def _active_trial_row(c: sqlite3.Cursor, device_id: str, android_id: str = ""):
+    """Return the most recent active trial row for this device, or None."""
+    c.execute("""
+        SELECT * FROM trial_usage
+        WHERE device_id = ? AND is_active = 1
+        ORDER BY id DESC LIMIT 1
+    """, (device_id,))
+    row = c.fetchone()
+    if row:
+        return row
+
+    # Fallback: look up by android_id in case device_id changed (reinstall)
+    if android_id:
+        c.execute("""
+            SELECT * FROM trial_usage
+            WHERE android_id = ? AND is_active = 1
+            ORDER BY id DESC LIMIT 1
+        """, (android_id,))
+        row = c.fetchone()
+
+    return row
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT: /api/activate
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/activate", methods=["POST"])
+def activate():
+    """
+    Activate a paid key or start a trial.
+
+    Request body (JSON):
+        key        : "NOWORNEVER" for trial, or a paid activation key
+        device_id  : app-generated unique device identifier
+        android_id : android.provider.Settings.Secure.ANDROID_ID
+        wifi_bssid : WifiInfo.getBSSID()  — router MAC e.g. "AA:BB:CC:DD:EE:FF"
+        wifi_ip    : WifiInfo.getIpAddress() as string (optional but helpful)
+        build_fp   : android.os.Build.FINGERPRINT (optional)
+        rid        : client-generated UUID for this request
+
+    Successful paid response payload (inside "p"):
+        { ok: true, access: "paid", token: "<hex>", expires_at: null }
+
+    Successful trial response payload (inside "p"):
+        { ok: true, access: "trial", started_at: "...", expires_at: "...",
+          remaining_seconds: 3600 }
+
+    Error response payload (inside "p"):
+        { ok: false, reason: "<code>" }
+        reason codes: invalid_key | key_exhausted | trial_exhausted | server_error
+    """
+    data = request.get_json(silent=True) or {}
+    rid  = (data.get("rid") or secrets.token_hex(8))
+
+    if not data.get("key") or not data.get("device_id"):
+        return _err("missing required fields: key, device_id", rid)
+
+    fingerprint = _fp(data)
+    key         = data["key"].strip().upper()
+
+    if key == "NOWORNEVER":
+        return _activate_trial(fingerprint, rid)
+    return _activate_paid(fingerprint, key, rid)
+
+
+def _activate_trial(fp: dict, rid: str):
+    conn = get_db()
+    c    = conn.cursor()
+    try:
+        # ── Already has an active trial? Re-issue timing info. ──────────────
+        existing = _active_trial_row(c, fp["device_id"], fp["android_id"])
+        if existing:
+            now        = _now()
+            expires_at = _parse_iso(existing["expires_at"])
+            remaining  = max(0, int((expires_at - now).total_seconds())) if expires_at else 0
+
+            if remaining <= 0:
+                # Trial expired — mark inactive and reject
+                c.execute("UPDATE trial_usage SET is_active = 0 WHERE id = ?",
+                          (existing["id"],))
+                conn.commit()
+                return _err("trial_expired", rid, 403)
+
+            payload = {
+                "ok":               True,
+                "access":           "trial",
+                "started_at":       existing["started_at"],
+                "expires_at":       existing["expires_at"],
+                "remaining_seconds": remaining,
             }
+            return jsonify(_sign_response(payload, rid)), 200
+
+        # ── Check all fingerprints against historical trial records ─────────
+        if _trial_fingerprint_used(c, fp):
+            return _err("trial_exhausted", rid, 403)
+
+        # ── Grant new trial ─────────────────────────────────────────────────
+        now        = _now()
+        expires_at = now + timedelta(hours=TRIAL_HOURS)
+        now_iso    = now.isoformat()
+        exp_iso    = expires_at.isoformat()
+
+        c.execute("""
+            INSERT INTO trial_usage
+              (device_id, android_id, wifi_bssid, wifi_ip, build_fp,
+               started_at, expires_at, is_active, last_heartbeat)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        """, (fp["device_id"], fp["android_id"], fp["wifi_bssid"],
+              fp["wifi_ip"],   fp["build_fp"],   now_iso, exp_iso, now_iso))
+        conn.commit()
+
+        payload = {
+            "ok":               True,
+            "access":           "trial",
+            "started_at":       now_iso,
+            "expires_at":       exp_iso,
+            "remaining_seconds": int(TRIAL_HOURS * 3600),
         }
-    }
+        return jsonify(_sign_response(payload, rid)), 200
 
-    externalNativeBuild {
-        cmake {
-            path    = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1+"
-        }
-    }
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ trial activation error: {e}")
+        return _err("server_error", rid, 500)
+    finally:
+        conn.close()
 
-    buildTypes {
-        release {
-            isMinifyEnabled   = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-        debug {
-            isMinifyEnabled = false
-        }
-    }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+def _activate_paid(fp: dict, key: str, rid: str):
+    conn = get_db()
+    c    = conn.cursor()
+    try:
+        # ── Lookup key ──────────────────────────────────────────────────────
+        c.execute("SELECT * FROM activation_keys WHERE key = ?", (key,))
+        key_rec = c.fetchone()
+        if not key_rec:
+            return _err("invalid_key", rid, 403)
 
-    buildFeatures {
-        compose     = true
-        buildConfig = true
-        aidl        = true
-    }
-}
+        # ── Already activated on this device? Re-issue token. ───────────────
+        c.execute("""
+            SELECT * FROM device_activations
+            WHERE key_id = ? AND device_id = ?
+        """, (key_rec["id"], fp["device_id"]))
+        existing = c.fetchone()
 
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
-    }
-}
+        if existing:
+            token = _derive_token(fp["device_id"], key_rec["id"], key_rec["key"])
+            c.execute("UPDATE device_activations SET last_seen = ? WHERE id = ?",
+                      (_now_iso(), existing["id"]))
+            conn.commit()
+            payload = {"ok": True, "access": "paid", "token": token, "expires_at": None}
+            return jsonify(_sign_response(payload, rid)), 200
 
-dependencies {
-    compileOnly("de.robv.android.xposed:api:82")
+        # ── Check remaining slots ───────────────────────────────────────────
+        if key_rec["used_count"] >= key_rec["max_devices"]:
+            return _err("key_exhausted", rid, 403)
 
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:2.3.0")
+        # ── Activate ────────────────────────────────────────────────────────
+        token      = _derive_token(fp["device_id"], key_rec["id"], key_rec["key"])
+        token_hash = _hash_token(token)
+        now        = _now_iso()
+        new_count  = key_rec["used_count"] + 1
+        new_status = "exhausted" if new_count >= key_rec["max_devices"] else "partial"
 
-    implementation("androidx.core:core-ktx:1.16.0")
-    implementation("androidx.appcompat:appcompat:1.7.0")
+        c.execute("""
+            INSERT INTO device_activations
+              (key_id, device_id, android_id, wifi_bssid, wifi_ip, build_fp,
+               token_hash, activated_at, last_seen)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (key_rec["id"], fp["device_id"], fp["android_id"],
+              fp["wifi_bssid"], fp["wifi_ip"], fp["build_fp"],
+              token_hash, now, now))
 
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.1")
+        c.execute("""
+            UPDATE activation_keys
+            SET used_count = ?, status = ?, updated_at = ?
+            WHERE id = ?
+        """, (new_count, new_status, now, key_rec["id"]))
 
-    val composeBom = platform("androidx.compose:compose-bom:2025.06.00")
-    implementation(composeBom)
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.animation:animation")
-    implementation("androidx.compose.runtime:runtime")
-    implementation("androidx.activity:activity-compose:1.10.1")
+        conn.commit()
 
-    implementation("com.github.bumptech.glide:glide:4.16.0")
-    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+        payload = {"ok": True, "access": "paid", "token": token, "expires_at": None}
+        return jsonify(_sign_response(payload, rid)), 200
 
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    implementation("com.google.code.gson:gson:2.11.0")
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ paid activation error: {e}")
+        return _err("server_error", rid, 500)
+    finally:
+        conn.close()
 
-    implementation("com.arthenica:ffmpeg-kit-full:6.0-2")
 
-    implementation("androidx.camera:camera-core:1.4.2")
-    implementation("androidx.camera:camera-camera2:1.4.2")
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT: /api/verify
+# ─────────────────────────────────────────────────────────────────────────────
 
-    implementation("androidx.preference:preference-ktx:1.2.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    implementation("androidx.documentfile:documentfile:1.0.1")
-    implementation("com.jakewharton.timber:timber:5.0.1")
+@app.route("/api/verify", methods=["POST"])
+def verify():
+    """
+    Periodic access check. Call every ~5 minutes from the app.
 
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-}
-```
+    For paid devices:
+        Body: { device_id, token, rid }
 
-### STEP 8: Commit and Push
-Once all files are updated and the `libyuv-src` folder is present, run these git commands in the shell:
-```bash
-git add .
-git commit -m "chore: finalize production-ready native wrappers and CMake"
-git push origin main
-```
-(If the branch is main, use `git push origin main`).
+    For trial devices:
+        Body: { device_id, android_id, rid }
+        (no token — trial is looked up by device fingerprint)
 
-Please confirm once all steps are complete!
-```
+    Response payload:
+        Paid:  { ok: true,  access: "paid",  token, expires_at: null }
+        Trial: { ok: true,  access: "trial", remaining_seconds, expires_at, destruct: false }
+        Expired/invalid: { ok: false, access: "none", reason, destruct: true }
+
+    The app must:
+      1. Verify the HMAC signature.
+      2. If destruct == true, immediately stop all camera hooks and show
+         an expiry/invalid screen. Do not wait for the next heartbeat.
+    """
+    data = request.get_json(silent=True) or {}
+    rid  = (data.get("rid") or secrets.token_hex(8))
+
+    device_id  = (data.get("device_id")  or "").strip()
+    android_id = (data.get("android_id") or "").strip()
+    token      = (data.get("token")      or "").strip()
+
+    if not device_id:
+        return _err("missing device_id", rid)
+
+    conn = get_db()
+    c    = conn.cursor()
+    try:
+        # ── Paid path ────────────────────────────────────────────────────────
+        if token:
+            token_hash = _hash_token(token)
+            c.execute("""
+                SELECT da.id, da.last_seen, ak.key
+                FROM device_activations da
+                JOIN activation_keys ak ON ak.id = da.key_id
+                WHERE da.device_id = ? AND da.token_hash = ?
+            """, (device_id, token_hash))
+            row = c.fetchone()
+
+            if not row:
+                payload = {"ok": False, "access": "none",
+                           "reason": "not_activated", "destruct": True}
+                return jsonify(_sign_response(payload, rid)), 403
+
+            c.execute("UPDATE device_activations SET last_seen = ? WHERE id = ?",
+                      (_now_iso(), row["id"]))
+            conn.commit()
+
+            payload = {"ok": True, "access": "paid", "token": token,
+                       "expires_at": None, "destruct": False}
+            return jsonify(_sign_response(payload, rid)), 200
+
+        # ── Trial path ───────────────────────────────────────────────────────
+        row = _active_trial_row(c, device_id, android_id)
+
+        if not row:
+            payload = {"ok": False, "access": "none",
+                       "reason": "no_trial", "destruct": True}
+            return jsonify(_sign_response(payload, rid)), 403
+
+        now        = _now()
+        expires_at = _parse_iso(row["expires_at"])
+        remaining  = int((expires_at - now).total_seconds()) if expires_at else 0
+
+        c.execute("UPDATE trial_usage SET last_heartbeat = ? WHERE id = ?",
+                  (now.isoformat(), row["id"]))
+
+        if remaining <= 0:
+            c.execute("UPDATE trial_usage SET is_active = 0 WHERE id = ?", (row["id"],))
+            conn.commit()
+            payload = {"ok": False, "access": "none", "reason": "trial_expired",
+                       "remaining_seconds": 0, "expires_at": row["expires_at"],
+                       "destruct": True}
+            return jsonify(_sign_response(payload, rid)), 200
+
+        conn.commit()
+        payload = {"ok": True, "access": "trial", "remaining_seconds": remaining,
+                   "expires_at": row["expires_at"], "destruct": False}
+        return jsonify(_sign_response(payload, rid)), 200
+
+    except Exception as e:
+        print(f"❌ verify error: {e}")
+        return _err("server_error", rid, 500)
+    finally:
+        conn.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT: /api/heartbeat
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/heartbeat", methods=["POST"])
+def heartbeat():
+    """
+    Lightweight timer ping. Trial apps call this every 60 seconds.
+    Paid apps do NOT need to call this — use /api/verify on a longer interval.
+
+    Request body: { device_id, android_id, rid }
+
+    Response payload:
+        Active:  { ok: true,  destruct: false, remaining_seconds: N }
+        Expired: { ok: false, destruct: true,  remaining_seconds: 0, reason: "trial_expired" }
+        Unknown: { ok: false, destruct: true,  reason: "no_trial" }
+
+    When the app receives destruct: true it MUST:
+      • Stop injecting frames immediately
+      • Close camera session
+      • Show "Trial expired" UI
+      • Not retry heartbeat until user re-activates
+    """
+    data = request.get_json(silent=True) or {}
+    rid  = (data.get("rid") or secrets.token_hex(8))
+
+    device_id  = (data.get("device_id")  or "").strip()
+    android_id = (data.get("android_id") or "").strip()
+
+    if not device_id:
+        return _err("missing device_id", rid)
+
+    conn = get_db()
+    c    = conn.cursor()
+    try:
+        row = _active_trial_row(c, device_id, android_id)
+
+        if not row:
+            payload = {"ok": False, "destruct": True, "reason": "no_trial"}
+            return jsonify(_sign_response(payload, rid)), 200
+
+        now        = _now()
+        expires_at = _parse_iso(row["expires_at"])
+        remaining  = int((expires_at - now).total_seconds()) if expires_at else 0
+
+        c.execute("UPDATE trial_usage SET last_heartbeat = ? WHERE id = ?",
+                  (now.isoformat(), row["id"]))
+
+        if remaining <= 0:
+            c.execute("UPDATE trial_usage SET is_active = 0 WHERE id = ?", (row["id"],))
+            conn.commit()
+            payload = {"ok": False, "destruct": True,
+                       "reason": "trial_expired", "remaining_seconds": 0}
+            return jsonify(_sign_response(payload, rid)), 200
+
+        conn.commit()
+        payload = {"ok": True, "destruct": False, "remaining_seconds": remaining}
+        return jsonify(_sign_response(payload, rid)), 200
+
+    except Exception as e:
+        print(f"❌ heartbeat error: {e}")
+        return _err("server_error", rid, 500)
+    finally:
+        conn.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADMIN ENDPOINTS  — require X-Admin-Key header
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/admin/generate_key", methods=["POST"])
+def admin_generate_key():
+    """
+    Generate a new paid activation key.
+
+    Headers: X-Admin-Key: <FACEGATE_ADMIN_KEY>
+    Body:    { max_devices: 1 }   (optional, default 1)
+
+    Response: { key, max_devices, status }
+    """
+    _require_admin()
+    data        = request.get_json(silent=True) or {}
+    max_devices = max(1, int(data.get("max_devices", 1)))
+
+    key = str(uuid.uuid4()).replace("-", "").upper()[:20]
+    now = _now_iso()
+
+    conn = get_db()
+    c    = conn.cursor()
+    try:
+        c.execute("""
+            INSERT INTO activation_keys
+              (key, max_devices, is_trial, status, created_at, updated_at)
+            VALUES (?, ?, 0, 'unused', ?, ?)
+        """, (key, max_devices, now, now))
+        conn.commit()
+        return jsonify({"key": key, "max_devices": max_devices, "status": "unused"}), 201
+    finally:
+        conn.close()
+
+
+@app.route("/api/admin/key_info/<key>", methods=["GET"])
+def admin_key_info(key: str):
+    """
+    Returns full status of an activation key.
+    Headers: X-Admin-Key: <FACEGATE_ADMIN_KEY>
+    """
+    _require_admin()
+    conn = get_db()
+    c    = conn.cursor()
+    try:
+        c.execute("SELECT * FROM activation_keys WHERE key = ?", (key.upper(),))
+        rec = c.fetchone()
+        if not rec:
+            return jsonify({"error": "not_found"}), 404
+
+        c.execute("""
+            SELECT device_id, android_id, wifi_bssid, activated_at, last_seen
+            FROM device_activations WHERE key_id = ?
+        """, (rec["id"],))
+        devices = [dict(r) for r in c.fetchall()]
+
+        return jsonify({
+            "key":         rec["key"],
+            "max_devices": rec["max_devices"],
+            "used_count":  rec["used_count"],
+            "remaining":   rec["max_devices"] - rec["used_count"],
+            "status":      rec["status"],
+            "devices":     devices,
+        })
+    finally:
+        conn.close()
+
+
+@app.route("/api/admin/revoke_device", methods=["POST"])
+def admin_revoke_device():
+    """
+    Revoke a specific device activation (e.g. fraudulent use).
+    Body: { key, device_id }
+    Headers: X-Admin-Key: <FACEGATE_ADMIN_KEY>
+
+    This deletes the device_activation row AND decrements used_count so the
+    slot can be re-used. The device's token becomes invalid immediately.
+    """
+    _require_admin()
+    data      = request.get_json(silent=True) or {}
+    key       = (data.get("key") or "").strip().upper()
+    device_id = (data.get("device_id") or "").strip()
+
+    if not key or not device_id:
+        return jsonify({"error": "missing key or device_id"}), 400
+
+    conn = get_db()
+    c    = conn.cursor()
+    try:
+        c.execute("SELECT * FROM activation_keys WHERE key = ?", (key,))
+        rec = c.fetchone()
+        if not rec:
+            return jsonify({"error": "key not found"}), 404
+
+        c.execute("""
+            DELETE FROM device_activations WHERE key_id = ? AND device_id = ?
+        """, (rec["id"], device_id))
+        deleted = c.rowcount
+
+        if deleted:
+            new_count  = max(0, rec["used_count"] - 1)
+            new_status = "unused" if new_count == 0 else "partial"
+            c.execute("""
+                UPDATE activation_keys
+                SET used_count = ?, status = ?, updated_at = ?
+                WHERE id = ?
+            """, (new_count, new_status, _now_iso(), rec["id"]))
+
+        conn.commit()
+        return jsonify({"revoked": bool(deleted), "device_id": device_id})
+    finally:
+        conn.close()
+
+
+@app.route("/api/admin/trial_history", methods=["GET"])
+def admin_trial_history():
+    """
+    List all trial records (useful for fraud investigation).
+    Headers: X-Admin-Key: <FACEGATE_ADMIN_KEY>
+    Query params: limit (default 50), offset (default 0)
+    """
+    _require_admin()
+    limit  = min(int(request.args.get("limit",  50)), 200)
+    offset = int(request.args.get("offset", 0))
+
+    conn = get_db()
+    c    = conn.cursor()
+    try:
+        c.execute("""
+            SELECT device_id, android_id, wifi_bssid, wifi_ip, build_fp,
+                   started_at, expires_at, is_active, last_heartbeat
+            FROM trial_usage
+            ORDER BY id DESC LIMIT ? OFFSET ?
+        """, (limit, offset))
+        rows = [dict(r) for r in c.fetchall()]
+        return jsonify({"trials": rows, "count": len(rows)})
+    finally:
+        conn.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HEALTH
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "ts": _now_iso()}), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENTRY POINT
+# ─────────────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    init_db()
+
+    secret_source = "[from env ✅]" if "FACEGATE_HMAC_SECRET" in os.environ else "[DEFAULT — CHANGE BEFORE DEPLOY ⚠️]"
+    admin_source  = "[from env ✅]" if "FACEGATE_ADMIN_KEY"   in os.environ else "[DEFAULT — CHANGE BEFORE DEPLOY ⚠️]"
+
+    print("=" * 60)
+    print("🚀  FaceGate Hardened Activation Server")
+    print(f"    HMAC secret : {secret_source}")
+    print(f"    Admin key   : {admin_source}")
+    print("=" * 60)
+    print("  POST /api/activate          — activate key / start trial")
+    print("  POST /api/verify            — periodic access check (every 5 min)")
+    print("  POST /api/heartbeat         — trial timer ping (every 60 s)")
+    print("  POST /api/admin/generate_key")
+    print("  GET  /api/admin/key_info/<key>")
+    print("  POST /api/admin/revoke_device")
+    print("  GET  /api/admin/trial_history")
+    print("=" * 60)
+
+    # Never run with debug=True in production — it leaks tracebacks
+    app.run(host="0.0.0.0", port=5000, debug=False)
+
+
+
+when done push the changes and start the build from the workflow and monitor it untill the build is done completely without any errors...if there is error then fetch it and see the error and apply the fix and restart the build and monitor
